@@ -24,6 +24,16 @@ describe('getNodeParameter in the mock contexts', () => {
 		expect(ctx.getNodeParameter('missing', true)).toBe(true);
 	});
 
+	it('load options: getCurrentNodeParameter reads dotted names from currentParams', () => {
+		const { ctx } = createLoadOptionsContext({
+			currentParams: { pipelineId: 'p1', additionalFields: { pipelineId: 'p2' } },
+		});
+
+		expect(ctx.getCurrentNodeParameter('pipelineId')).toBe('p1');
+		expect(ctx.getCurrentNodeParameter('additionalFields.pipelineId')).toBe('p2');
+		expect(ctx.getCurrentNodeParameter('filters.pipelineId')).toBeUndefined();
+	});
+
 	it('hook: (name, fallback) has no item index', () => {
 		const { ctx } = createHookContext({ params: { events: ['lead.created'] } });
 

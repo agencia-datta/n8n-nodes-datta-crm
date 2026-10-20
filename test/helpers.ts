@@ -30,6 +30,8 @@ export interface ContextOptions {
 	continueOnFail?: boolean;
 	/** Input items for `getInputData()` (execute context). Defaults to one empty item per params entry. */
 	items?: INodeExecutionData[];
+	/** Values `getCurrentNodeParameter(name)` returns in the load-options context (dotted names). */
+	currentParams?: Params;
 }
 
 export const DEFAULT_CREDENTIALS = {
@@ -192,7 +194,12 @@ export interface LoadOptionsMock {
 /** Mock `ILoadOptionsFunctions` (loadOptions methods). */
 export function createLoadOptionsContext(options: ContextOptions = {}): LoadOptionsMock {
 	const base = buildBase(options);
-	return { ctx: base as unknown as ILoadOptionsFunctions, request: base.request };
+	const currentParams = options.currentParams ?? {};
+	const ctx = {
+		...base,
+		getCurrentNodeParameter: vi.fn((name: string) => readPath(currentParams, name)),
+	};
+	return { ctx: ctx as unknown as ILoadOptionsFunctions, request: base.request };
 }
 
 export interface HookOptions extends ContextOptions {
