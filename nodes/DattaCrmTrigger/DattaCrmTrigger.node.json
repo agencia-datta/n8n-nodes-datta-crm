@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-datta-crm.dattaCrmTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Sales", "Marketing & Content"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://help.agenciadatta.com.br/integracoes/api/n8n/"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://help.agenciadatta.com.br/integracoes/api/n8n/"
+			}
+		]
+	}
+}
