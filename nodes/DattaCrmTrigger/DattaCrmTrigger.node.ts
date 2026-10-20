@@ -85,13 +85,48 @@ function textFilter(name: FilterKey, displayName: string, description: string): 
 function workflowWebhookName(context: IHookFunctions): string {
 	const workflowName = context.getWorkflow().name;
 	if (typeof workflowName !== 'string' || workflowName.trim() === '') return 'n8n';
-	return `n8n · ${workflowName}`.slice(0, MAX_NAME_LENGTH).trimEnd();
+	// Count code points, not UTF-16 units, so an emoji is never cut in half.
+	return Array.from(`n8n · ${workflowName}`).slice(0, MAX_NAME_LENGTH).join('').trimEnd();
 }
 
-function clearStaticData(context: IHookFunctions): void {
-	const staticData = context.getWorkflowStaticData('node');
-	delete staticData.webhookId;
-	delete staticData.webhookSecret;
+interface StoredEntry {
+	id: string;
+	secret: string;
+}
+
+/**
+ * n8n registers a test URL (while listening for a test event) and a production URL (active
+ * workflow) for the same node, and both share the node's static data. Each URL therefore keeps its
+ * own entry in `staticData.webhooks`, so one never overwrites or clears the other.
+ */
+function existingEntries(staticData: IDataObject): Record<string, StoredEntry> | undefined {
+	const value = staticData.webhooks;
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+	return value as unknown as Record<string, StoredEntry>;
+}
+
+function writeEntry(staticData: IDataObject, url: string, entry: StoredEntry): void {
+	const entries = existingEntries(staticData) ?? {};
+	entries[url] = entry;
+	staticData.webhooks = entries as unknown as IDataObject;
+}
+
+function readEntry(staticData: IDataObject, url: string | undefined): StoredEntry | undefined {
+	if (url === undefined) return undefined;
+	const entry = existingEntries(staticData)?.[url];
+	if (typeof entry?.id !== 'string' || entry.id === '') return undefined;
+	if (typeof entry.secret !== 'string') return undefined;
+	return entry;
+}
+
+function removeEntry(staticData: IDataObject, url: string | undefined): void {
+	const entries = existingEntries(staticData);
+	if (entries !== undefined && url !== undefined) delete entries[url];
+}
+
+function unexpectedResponse(context: IHookFunctions, description: string): NodeApiError {
+	const message = 'Unexpected response from Datta CRM';
+	return new NodeApiError(context.getNode(), { message }, { message, description });
 }
 
 /** DELETE /webhooks/{id}. A 404 means it is already gone, which is the goal. */
@@ -210,25 +245,28 @@ export class DattaCrmTrigger implements INodeType {
 	webhookMethods = {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
-				const webhookId = this.getWorkflowStaticData('node').webhookId;
-				if (typeof webhookId !== 'string' || webhookId === '') {
-					clearStaticData(this);
+				const staticData = this.getWorkflowStaticData('node');
+				const url = this.getNodeWebhookUrl('default');
+				const entry = readEntry(staticData, url);
+				if (entry === undefined) {
+					removeEntry(staticData, url);
 					return false;
 				}
 
-				const webhooks = (await dattaCrmRequest.call(this, 'GET', '/webhooks')) as
-					| StoredWebhook[]
-					| undefined;
-				const found = (webhooks ?? []).find((webhook) => webhook.id === webhookId);
-				if (found === undefined || found.targetUrl !== this.getNodeWebhookUrl('default')) {
-					clearStaticData(this);
+				const webhooks = (await dattaCrmRequest.call(this, 'GET', '/webhooks')) as unknown;
+				if (!Array.isArray(webhooks)) {
+					throw unexpectedResponse(this, 'Expected a list in "data" for GET /webhooks.');
+				}
+				const found = (webhooks as StoredWebhook[]).find((webhook) => webhook.id === entry.id);
+				if (found === undefined || found.targetUrl !== url) {
+					removeEntry(staticData, url);
 					return false;
 				}
 				if (found.status === 'active') return true;
 
 				// Paused or disabled: remove it so activating the workflow creates a working one.
-				await deleteRemoteWebhook(this, webhookId);
-				clearStaticData(this);
+				await deleteRemoteWebhook(this, entry.id);
+				removeEntry(staticData, url);
 				return false;
 			},
 
@@ -239,38 +277,51 @@ export class DattaCrmTrigger implements INodeType {
 						description: 'The trigger needs at least one event to listen to.',
 					});
 				}
+				const url = this.getNodeWebhookUrl('default');
 				const filters = buildFilters(events, this.getNodeParameter('filters', {}) as IDataObject);
 				const body: IDataObject = {
-					targetUrl: this.getNodeWebhookUrl('default'),
+					targetUrl: url,
 					events,
 					ignoreOwnChanges: this.getNodeParameter('ignoreOwnChanges', true) as boolean,
 					name: workflowWebhookName(this),
 				};
 				if (Object.keys(filters).length > 0) body.filters = filters;
 
-				const created = (await dattaCrmRequest.call(this, 'POST', '/webhooks', body)) as {
-					webhook: { id: string };
-					secret: string;
-				};
-				const staticData = this.getWorkflowStaticData('node');
-				staticData.webhookId = created.webhook.id;
-				staticData.webhookSecret = created.secret;
+				const created = (await dattaCrmRequest.call(this, 'POST', '/webhooks', body)) as
+					| { webhook?: { id?: unknown }; secret?: unknown }
+					| undefined;
+				const id = created?.webhook?.id;
+				const secret = created?.secret;
+				if (typeof id !== 'string' || id === '' || typeof secret !== 'string' || secret === '') {
+					throw unexpectedResponse(
+						this,
+						'Expected "data.webhook.id" and "data.secret" in the response of POST /webhooks.',
+					);
+				}
+				if (url !== undefined) {
+					writeEntry(this.getWorkflowStaticData('node'), url, { id, secret });
+				}
 				return true;
 			},
 
 			async delete(this: IHookFunctions): Promise<boolean> {
-				const webhookId = this.getWorkflowStaticData('node').webhookId;
-				if (typeof webhookId !== 'string' || webhookId === '') return true;
+				const staticData = this.getWorkflowStaticData('node');
+				const url = this.getNodeWebhookUrl('default');
+				const entry = readEntry(staticData, url);
+				if (entry === undefined) {
+					removeEntry(staticData, url);
+					return true;
+				}
 				try {
-					await deleteRemoteWebhook(this, webhookId);
+					await deleteRemoteWebhook(this, entry.id);
 				} catch (error) {
-					// Could not remove it remotely: keep the stored id so a later attempt can retry.
+					// Could not remove it remotely: keep the stored entry so a later attempt can retry.
 					this.logger.error('Could not delete the Datta CRM webhook', {
 						message: error instanceof Error ? error.message : String(error),
 					});
 					return false;
 				}
-				clearStaticData(this);
+				removeEntry(staticData, url);
 				return true;
 			},
 		},
@@ -278,7 +329,10 @@ export class DattaCrmTrigger implements INodeType {
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const req = this.getRequestObject();
-		const secret = this.getWorkflowStaticData('node').webhookSecret;
+		const secret = readEntry(
+			this.getWorkflowStaticData('node'),
+			this.getNodeWebhookUrl('default'),
+		)?.secret;
 		const rawBody = (req as { rawBody?: Buffer | string }).rawBody;
 
 		if (

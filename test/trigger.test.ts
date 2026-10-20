@@ -5,6 +5,7 @@ import { DattaCrmTrigger, buildFilters } from '../nodes/DattaCrmTrigger/DattaCrm
 import { apiError, createHookContext, createWebhookContext, ok, type HookOptions } from './helpers';
 
 const WEBHOOK_URL = 'https://n8n.example.com/webhook/abc';
+const TEST_URL = 'https://n8n.example.com/webhook-test/abc';
 const methods = new DattaCrmTrigger().webhookMethods.default;
 
 function webhook(overrides: Record<string, unknown> = {}) {
@@ -20,12 +21,21 @@ function webhook(overrides: Record<string, unknown> = {}) {
 	};
 }
 
+/** Static data as the node stores it: one entry per target URL. */
+function seeded(id = 'wh-1', secret = 'whsec_stored', url = WEBHOOK_URL) {
+	return { webhooks: { [url]: { id, secret } } };
+}
+
 function hook(options: HookOptions = {}) {
 	return createHookContext({ webhookUrl: WEBHOOK_URL, ...options });
 }
 
 function requestOptions(request: { mock: { calls: unknown[][] } }, n: number) {
 	return request.mock.calls[n][1] as Record<string, unknown>;
+}
+
+function created(id: string, secret: string, url = WEBHOOK_URL) {
+	return ok({ webhook: webhook({ id, targetUrl: url }), secret }, undefined, 201);
 }
 
 describe('buildFilters', () => {
@@ -75,13 +85,13 @@ describe('description', () => {
 });
 
 describe('checkExists', () => {
-	it('returns false and clears static data when the webhook is not in the list', async () => {
+	it('returns false and removes the entry when the webhook is not in the list', async () => {
 		const { ctx, staticData, request } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
 			responses: [ok([webhook({ id: 'other' })])],
 		});
 		expect(await methods.checkExists.call(ctx)).toBe(false);
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 		expect(request).toHaveBeenCalledTimes(1);
 	});
 
@@ -91,31 +101,31 @@ describe('checkExists', () => {
 		expect(request).not.toHaveBeenCalled();
 	});
 
-	it('returns false when the stored id points at another target URL', async () => {
+	it('returns false when the remote webhook has another target URL', async () => {
 		const { ctx, staticData } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
 			responses: [ok([webhook({ targetUrl: 'https://old.example.com/webhook/zzz' })])],
 		});
 		expect(await methods.checkExists.call(ctx)).toBe(false);
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 	});
 
 	it('returns true for an active webhook with the same URL', async () => {
 		const { ctx, staticData, request } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
 			responses: [ok([webhook()])],
 		});
 		expect(await methods.checkExists.call(ctx)).toBe(true);
-		expect(staticData).toEqual({ webhookId: 'wh-1', webhookSecret: 's' });
+		expect(staticData).toEqual(seeded());
 		expect(requestOptions(request, 0)).toMatchObject({
 			method: 'GET',
 			url: 'https://crm.example.com/api/v1/webhooks',
 		});
 	});
 
-	it('deletes a paused webhook, clears static data and returns false', async () => {
+	it('deletes a paused webhook, removes the entry and returns false', async () => {
 		const { ctx, staticData, request } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
 			responses: [ok([webhook({ status: 'paused' })]), ok({ deleted: true, id: 'wh-1' })],
 		});
 		expect(await methods.checkExists.call(ctx)).toBe(false);
@@ -124,40 +134,82 @@ describe('checkExists', () => {
 			method: 'DELETE',
 			url: 'https://crm.example.com/api/v1/webhooks/wh-1',
 		});
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 	});
 
 	it('tolerates a 404 while deleting a disabled webhook', async () => {
 		const { ctx, staticData } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
 			responses: [
 				ok([webhook({ status: 'disabled' })]),
 				apiError(404, 'not_found', 'Webhook nao encontrado.'),
 			],
 		});
 		expect(await methods.checkExists.call(ctx)).toBe(false);
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 	});
 
-	it('propagates a failed list request and keeps static data', async () => {
+	it('rejects and keeps the entry when deleting a paused webhook fails with 500', async () => {
 		const { ctx, staticData } = hook({
-			staticData: { webhookId: 'wh-1', webhookSecret: 's' },
+			staticData: seeded(),
+			responses: [
+				ok([webhook({ status: 'paused' })]),
+				apiError(500, 'internal_error', 'Erro interno.'),
+			],
+		});
+		await expect(methods.checkExists.call(ctx)).rejects.toMatchObject({
+			message: 'Erro interno.',
+			httpCode: '500',
+		});
+		expect(staticData).toEqual(seeded());
+	});
+
+	it('propagates a failed list request and keeps the entry', async () => {
+		const { ctx, staticData } = hook({
+			staticData: seeded(),
 			responses: [apiError(401, 'invalid_api_key', 'Chave invalida.')],
 		});
 		await expect(methods.checkExists.call(ctx)).rejects.toBeInstanceOf(NodeApiError);
-		expect(staticData).toEqual({ webhookId: 'wh-1', webhookSecret: 's' });
+		expect(staticData).toEqual(seeded());
+	});
+
+	it('raises a clear error when the list response is not an array', async () => {
+		const { ctx, staticData } = hook({
+			staticData: seeded(),
+			responses: [ok({ unexpected: true })],
+		});
+		const failure = await methods.checkExists.call(ctx).catch((error: unknown) => error);
+		expect(failure).toBeInstanceOf(NodeApiError);
+		expect((failure as NodeApiError).message).toBe('Unexpected response from Datta CRM');
+		expect(staticData).toEqual(seeded());
+	});
+
+	it('only touches the entry of its own URL', async () => {
+		const staticData = {
+			webhooks: {
+				...seeded('wh-prod', 'whsec_prod').webhooks,
+				...seeded('wh-test', 'whsec_test', TEST_URL).webhooks,
+			},
+		};
+		const { ctx } = hook({
+			webhookUrl: TEST_URL,
+			staticData,
+			responses: [ok([webhook({ id: 'wh-prod' })])],
+		});
+		expect(await methods.checkExists.call(ctx)).toBe(false);
+		expect(staticData.webhooks).toEqual(seeded('wh-prod', 'whsec_prod').webhooks);
 	});
 });
 
 describe('create', () => {
-	it('posts the expected body and stores the id and secret', async () => {
+	it('posts the expected body and stores the id and secret under the URL', async () => {
 		const { ctx, staticData, request } = hook({
 			params: {
 				events: ['sale.paid', 'deal.won'],
 				filters: { productId: 'p1, p2', pipelineId: ['pipe-1'] },
 			},
 			workflow: { id: 'wf-1', name: 'My workflow', active: true },
-			responses: [ok({ webhook: webhook({ id: 'wh-9' }), secret: 'whsec_abc' }, undefined, 201)],
+			responses: [created('wh-9', 'whsec_abc')],
 		});
 		expect(await methods.create.call(ctx)).toBe(true);
 		expect(requestOptions(request, 0)).toMatchObject({
@@ -174,13 +226,13 @@ describe('create', () => {
 				name: 'n8n · My workflow',
 			},
 		});
-		expect(staticData).toEqual({ webhookId: 'wh-9', webhookSecret: 'whsec_abc' });
+		expect(staticData).toEqual(seeded('wh-9', 'whsec_abc'));
 	});
 
 	it('omits filters when none are set and honours ignoreOwnChanges false', async () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'], ignoreOwnChanges: false },
-			responses: [ok({ webhook: webhook(), secret: 's' }, undefined, 201)],
+			responses: [created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
 		const body = requestOptions(request, 0).body as Record<string, unknown>;
@@ -192,20 +244,32 @@ describe('create', () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'] },
 			workflow: { id: 'wf-1', name: 'a'.repeat(73) + ' tail words', active: true },
-			responses: [ok({ webhook: webhook(), secret: 's' }, undefined, 201)],
+			responses: [created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
 		const name = (requestOptions(request, 0).body as { name: string }).name;
-		expect(name.length).toBeLessThanOrEqual(80);
-		expect(name.startsWith('n8n · ')).toBe(true);
-		expect(name).toBe(name.trimEnd());
+		expect(name).toBe('n8n · ' + 'a'.repeat(73));
+		expect(Array.from(name)).toHaveLength(79);
+	});
+
+	it('truncates by code points so an emoji is never split', async () => {
+		const { ctx, request } = hook({
+			params: { events: ['lead.created'] },
+			workflow: { id: 'wf-1', name: '\u{1F600}'.repeat(100), active: true },
+			responses: [created('wh-1', 's')],
+		});
+		await methods.create.call(ctx);
+		const name = (requestOptions(request, 0).body as { name: string }).name;
+		expect(name).toBe('n8n · ' + '\u{1F600}'.repeat(74));
+		expect(Array.from(name)).toHaveLength(80);
+		expect(name.isWellFormed()).toBe(true);
 	});
 
 	it('falls back to "n8n" when the workflow has no name', async () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'] },
 			workflow: { id: 'wf-1', name: '', active: true },
-			responses: [ok({ webhook: webhook(), secret: 's' }, undefined, 201)],
+			responses: [created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
 		expect((requestOptions(request, 0).body as { name: string }).name).toBe('n8n');
@@ -229,14 +293,30 @@ describe('create', () => {
 		});
 		expect(staticData).toEqual({});
 	});
+
+	it.each([
+		['no webhook', { secret: 's' }],
+		['a webhook without an id', { webhook: {}, secret: 's' }],
+		['a non-string id', { webhook: { id: 7 }, secret: 's' }],
+		['no secret', { webhook: { id: 'wh-1' } }],
+		['an empty secret', { webhook: { id: 'wh-1' }, secret: '' }],
+		['a null body', null],
+	])('raises a clear error and stores nothing when the response has %s', async (_label, data) => {
+		const { ctx, staticData } = hook({
+			params: { events: ['lead.created'] },
+			responses: [ok(data, undefined, 201)],
+		});
+		const failure = await methods.create.call(ctx).catch((error: unknown) => error);
+		expect(failure).toBeInstanceOf(NodeApiError);
+		expect((failure as NodeApiError).message).toBe('Unexpected response from Datta CRM');
+		expect(staticData).toEqual({});
+	});
 });
 
 describe('delete', () => {
-	const stored = { webhookId: 'wh-1', webhookSecret: 'whsec_do_not_log' };
-
-	it('deletes the webhook and clears static data', async () => {
+	it('deletes the webhook and removes the entry', async () => {
 		const { ctx, staticData, request } = hook({
-			staticData: { ...stored },
+			staticData: seeded(),
 			responses: [ok({ deleted: true, id: 'wh-1' })],
 		});
 		expect(await methods.delete.call(ctx)).toBe(true);
@@ -244,36 +324,36 @@ describe('delete', () => {
 			method: 'DELETE',
 			url: 'https://crm.example.com/api/v1/webhooks/wh-1',
 		});
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 	});
 
-	it('treats a 404 as success and clears static data', async () => {
+	it('treats a 404 as success and removes the entry', async () => {
 		const { ctx, staticData } = hook({
-			staticData: { ...stored },
+			staticData: seeded(),
 			responses: [apiError(404, 'not_found', 'Webhook nao encontrado.')],
 		});
 		expect(await methods.delete.call(ctx)).toBe(true);
-		expect(staticData).toEqual({});
+		expect(staticData).toEqual({ webhooks: {} });
 	});
 
-	it('returns false on a 500, keeps static data and logs without the secret', async () => {
+	it('returns false on a 500, keeps the entry and logs without the secret', async () => {
 		const { ctx, staticData, logger } = hook({
-			staticData: { ...stored },
+			staticData: seeded('wh-1', 'whsec_do_not_log'),
 			responses: [apiError(500, 'internal_error', 'Erro interno.')],
 		});
 		expect(await methods.delete.call(ctx)).toBe(false);
-		expect(staticData).toEqual(stored);
+		expect(staticData).toEqual(seeded('wh-1', 'whsec_do_not_log'));
 		expect(logger.error).toHaveBeenCalledTimes(1);
-		expect(JSON.stringify(logger.error.mock.calls)).not.toContain(stored.webhookSecret);
+		expect(JSON.stringify(logger.error.mock.calls)).not.toContain('whsec_do_not_log');
 	});
 
 	it('returns false on a transport failure', async () => {
 		const { ctx, staticData } = hook({
-			staticData: { ...stored },
+			staticData: seeded(),
 			responses: [new Error('socket closed unexpectedly')],
 		});
 		expect(await methods.delete.call(ctx)).toBe(false);
-		expect(staticData).toEqual(stored);
+		expect(staticData).toEqual(seeded());
 	});
 
 	it('returns true without a request when nothing is stored', async () => {
@@ -283,16 +363,108 @@ describe('delete', () => {
 	});
 });
 
+describe('test and production URLs share static data', () => {
+	const trigger = new DattaCrmTrigger();
+	const prodSecret = 'whsec_production';
+	const testSecret = 'whsec_test_run';
+	const payload = { id: 'evt_1', event: 'lead.created', data: { id: 'l1' } };
+	const raw = Buffer.from(JSON.stringify(payload), 'utf8');
+	const sign = (secret: string) =>
+		`sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`;
+
+	it('keeps the production entry through a full test-URL cycle', async () => {
+		const staticData = seeded('wh-prod', prodSecret) as Record<string, unknown>;
+		const prodEntry = { ...seeded('wh-prod', prodSecret).webhooks };
+
+		// "Listen for test event": checkExists (nothing for the test URL) -> create.
+		const first = hook({ webhookUrl: TEST_URL, staticData, responses: [] });
+		expect(await methods.checkExists.call(first.ctx)).toBe(false);
+		expect(first.request).not.toHaveBeenCalled();
+
+		const second = hook({
+			webhookUrl: TEST_URL,
+			staticData,
+			params: { events: ['lead.created'] },
+			responses: [created('wh-test', testSecret, TEST_URL)],
+		});
+		expect(await methods.create.call(second.ctx)).toBe(true);
+		expect(staticData.webhooks).toEqual({
+			...prodEntry,
+			...seeded('wh-test', testSecret, TEST_URL).webhooks,
+		});
+
+		// A test delivery is verified with the test secret.
+		const delivery = createWebhookContext({
+			webhookUrl: TEST_URL,
+			staticData,
+			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': sign(testSecret) } },
+		});
+		expect(await trigger.webhook.call(delivery.ctx)).toEqual({
+			workflowData: [[{ json: payload }]],
+		});
+
+		// Stop listening: delete only removes the test entry.
+		const third = hook({
+			webhookUrl: TEST_URL,
+			staticData,
+			responses: [ok({ deleted: true, id: 'wh-test' })],
+		});
+		expect(await methods.delete.call(third.ctx)).toBe(true);
+		expect(requestOptions(third.request, 0)).toMatchObject({
+			url: 'https://crm.example.com/api/v1/webhooks/wh-test',
+		});
+		expect(staticData.webhooks).toEqual(prodEntry);
+
+		// Production still verifies and is still reported as existing.
+		const prodDelivery = createWebhookContext({
+			webhookUrl: WEBHOOK_URL,
+			staticData,
+			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': sign(prodSecret) } },
+		});
+		expect(await trigger.webhook.call(prodDelivery.ctx)).toEqual({
+			workflowData: [[{ json: payload }]],
+		});
+		const fourth = hook({ staticData, responses: [ok([webhook({ id: 'wh-prod' })])] });
+		expect(await methods.checkExists.call(fourth.ctx)).toBe(true);
+	});
+
+	it('verifies a production delivery with the production secret while a test entry exists', async () => {
+		const staticData = {
+			webhooks: {
+				...seeded('wh-prod', prodSecret).webhooks,
+				...seeded('wh-test', testSecret, TEST_URL).webhooks,
+			},
+		};
+		const good = createWebhookContext({
+			webhookUrl: WEBHOOK_URL,
+			staticData,
+			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': sign(prodSecret) } },
+		});
+		expect(await trigger.webhook.call(good.ctx)).toEqual({ workflowData: [[{ json: payload }]] });
+
+		// The test secret is not accepted at the production URL.
+		const bad = createWebhookContext({
+			webhookUrl: WEBHOOK_URL,
+			staticData,
+			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': sign(testSecret) } },
+		});
+		expect(await trigger.webhook.call(bad.ctx)).toEqual({ noWebhookResponse: true });
+		expect(bad.response.statusCode).toBe(401);
+	});
+});
+
 describe('webhook()', () => {
 	const trigger = new DattaCrmTrigger();
 	const secret = 'whsec_secret';
 	const payload = { id: 'evt_1', event: 'lead.created', data: { id: 'l1' } };
 	const raw = Buffer.from(JSON.stringify(payload), 'utf8');
 	const signature = `sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`;
+	const stored = () => seeded('wh-1', secret);
 
 	it('rejects a request without a signature with 401', async () => {
 		const { ctx, response } = createWebhookContext({
-			staticData: { webhookSecret: secret },
+			webhookUrl: WEBHOOK_URL,
+			staticData: stored(),
 			req: { body: payload, rawBody: raw, headers: {} },
 		});
 		const result = await trigger.webhook.call(ctx);
@@ -303,10 +475,23 @@ describe('webhook()', () => {
 		expect(response.ended).toBe(true);
 	});
 
-	it('rejects a wrong signature', async () => {
+	it('rejects a malformed signature', async () => {
 		const { ctx, response } = createWebhookContext({
-			staticData: { webhookSecret: secret },
+			webhookUrl: WEBHOOK_URL,
+			staticData: stored(),
 			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': 'sha256=deadbeef' } },
+		});
+		expect(await trigger.webhook.call(ctx)).toEqual({ noWebhookResponse: true });
+		expect(response.statusCode).toBe(401);
+	});
+
+	it('rejects a same-length (64 hex) wrong digest', async () => {
+		const wrong = `sha256=${createHmac('sha256', 'another secret').update(raw).digest('hex')}`;
+		expect(wrong).toHaveLength(signature.length);
+		const { ctx, response } = createWebhookContext({
+			webhookUrl: WEBHOOK_URL,
+			staticData: stored(),
+			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': wrong } },
 		});
 		expect(await trigger.webhook.call(ctx)).toEqual({ noWebhookResponse: true });
 		expect(response.statusCode).toBe(401);
@@ -314,15 +499,18 @@ describe('webhook()', () => {
 
 	it('rejects when the raw body is unavailable, even with a signature of the parsed body', async () => {
 		const { ctx, response } = createWebhookContext({
-			staticData: { webhookSecret: secret },
+			webhookUrl: WEBHOOK_URL,
+			staticData: stored(),
 			req: { body: payload, headers: { 'x-crm-signature': signature } },
 		});
 		expect(await trigger.webhook.call(ctx)).toEqual({ noWebhookResponse: true });
 		expect(response.statusCode).toBe(401);
 	});
 
-	it('rejects when no secret is stored', async () => {
+	it('rejects when no secret is stored for this URL', async () => {
 		const { ctx, response } = createWebhookContext({
+			webhookUrl: TEST_URL,
+			staticData: stored(),
 			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': signature } },
 		});
 		expect(await trigger.webhook.call(ctx)).toEqual({ noWebhookResponse: true });
@@ -331,7 +519,8 @@ describe('webhook()', () => {
 
 	it('returns the body as workflow data for a valid signature', async () => {
 		const { ctx, response } = createWebhookContext({
-			staticData: { webhookSecret: secret },
+			webhookUrl: WEBHOOK_URL,
+			staticData: stored(),
 			req: { body: payload, rawBody: raw, headers: { 'x-crm-signature': signature } },
 		});
 		const result = await trigger.webhook.call(ctx);
