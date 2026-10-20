@@ -2,7 +2,7 @@
 	"node": "n8n-nodes-datta-crm.dattaCrmTrigger",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Sales"],
+	"categories": ["Sales", "Marketing & Content"],
 	"resources": {
 		"credentialDocumentation": [
 			{
