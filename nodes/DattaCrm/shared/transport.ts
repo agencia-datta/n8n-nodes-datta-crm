@@ -45,17 +45,40 @@ function describeApiError({ error }: ApiErrorBody): string {
 	return lines.join('\n');
 }
 
+/**
+ * NodeApiError rewrites messages that contain well-known error tokens (for example
+ * "preexistente" contains EEXIST), so the message is assigned again after construction to keep
+ * the API text verbatim.
+ */
+function verbatimApiError(
+	context: DattaCrmContext,
+	errorResponse: JsonObject,
+	message: string,
+	description: string | undefined,
+	httpCode?: string,
+): NodeApiError {
+	const error = new NodeApiError(context.getNode(), errorResponse, {
+		message,
+		description,
+		httpCode,
+	});
+	error.message = message;
+	return error;
+}
+
 function buildApiError(context: DattaCrmContext, statusCode: number, body: unknown): NodeApiError {
 	const httpCode = String(statusCode);
 	if (isApiErrorBody(body)) {
-		return new NodeApiError(context.getNode(), body as unknown as JsonObject, {
-			message: body.error.message,
-			description: describeApiError(body),
+		return verbatimApiError(
+			context,
+			body as unknown as JsonObject,
+			body.error.message,
+			describeApiError(body),
 			httpCode,
-		});
+		);
 	}
 	const message = `Datta CRM returned HTTP ${statusCode}`;
-	return new NodeApiError(context.getNode(), { message }, { message, httpCode });
+	return verbatimApiError(context, { message }, message, undefined, httpCode);
 }
 
 function cleanQuery(qs: IDataObject | undefined): IDataObject | undefined {
@@ -124,7 +147,16 @@ export async function dattaCrmRequestPage(
 	qs?: IDataObject,
 ): Promise<{ items: IDataObject[]; nextCursor: string | null }> {
 	const { data, nextCursor } = await send(this, 'GET', path, undefined, qs);
-	return { items: (data ?? []) as IDataObject[], nextCursor };
+	if (!Array.isArray(data)) {
+		const message = 'Unexpected response from Datta CRM';
+		throw verbatimApiError(
+			this,
+			{ message },
+			message,
+			`Expected a list in "data" for GET ${path}.`,
+		);
+	}
+	return { items: data as IDataObject[], nextCursor };
 }
 
 /** Follows `nextCursor` until the end of the list, or until `max` items were collected. */
@@ -134,6 +166,7 @@ export async function dattaCrmRequestAll(
 	qs: IDataObject = {},
 	max?: number,
 ): Promise<IDataObject[]> {
+	if (max !== undefined && max <= 0) return [];
 	const all: IDataObject[] = [];
 	let cursor: string | null = null;
 	do {

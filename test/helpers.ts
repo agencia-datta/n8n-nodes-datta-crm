@@ -90,11 +90,37 @@ function readPath(source: unknown, name: string): unknown {
 	return current;
 }
 
-function makeGetNodeParameter(params: Params | Params[]) {
-	return (name: string, itemIndex = 0, fallback?: unknown) => {
+function lookupParameter(
+	record: Params,
+	name: string,
+	hasFallback: boolean,
+	fallback: unknown,
+): unknown {
+	const value = readPath(record, name);
+	if (value !== undefined) return value;
+	if (hasFallback) return fallback;
+	throw new Error(`Could not get parameter "${name}"`);
+}
+
+/**
+ * `IExecuteFunctions.getNodeParameter(name, itemIndex, fallback?)`.
+ * Throws for a missing parameter unless a fallback argument is passed (even `undefined`).
+ */
+function makeExecuteGetNodeParameter(params: Params | Params[]) {
+	return (name: string, itemIndex = 0, ...rest: unknown[]) => {
 		const record = Array.isArray(params) ? (params[itemIndex] ?? {}) : params;
-		const value = readPath(record, name);
-		return value === undefined ? fallback : value;
+		return lookupParameter(record, name, rest.length > 0, rest[0]);
+	};
+}
+
+/**
+ * `getNodeParameter(name, fallback?)` of the load-options, hook and webhook contexts: no item
+ * index. An array of params uses its first entry.
+ */
+function makeContextGetNodeParameter(params: Params | Params[]) {
+	return (name: string, ...rest: unknown[]) => {
+		const record = (Array.isArray(params) ? params[0] : params) ?? {};
+		return lookupParameter(record, name, rest.length > 0, rest[0]);
 	};
 }
 
@@ -124,7 +150,7 @@ function buildBase(options: ContextOptions): BaseMock {
 		request,
 		getNode: () => makeNode(),
 		getCredentials: vi.fn(async () => credentials),
-		getNodeParameter: vi.fn(makeGetNodeParameter(options.params ?? {})),
+		getNodeParameter: vi.fn(makeContextGetNodeParameter(options.params ?? {})),
 		helpers: { httpRequestWithAuthentication: request },
 	};
 }
@@ -142,6 +168,7 @@ export function createExecuteContext(options: ContextOptions = {}): ExecuteMock 
 	const items = options.items ?? Array.from({ length: count }, () => ({ json: {} }));
 	const ctx = {
 		...base,
+		getNodeParameter: vi.fn(makeExecuteGetNodeParameter(options.params ?? {})),
 		getInputData: () => items,
 		continueOnFail: () => options.continueOnFail ?? false,
 		helpers: {

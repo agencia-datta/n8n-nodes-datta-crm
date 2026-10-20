@@ -87,6 +87,29 @@ describe('dattaCrmRequest', () => {
 		expect(error.httpCode).toBe('409');
 	});
 
+	it('keeps the API message verbatim even when it contains an n8n error token', async () => {
+		const message = 'Já existe um lead preexistente com este telefone.';
+		const { ctx } = createExecuteContext({
+			responses: [apiError(409, 'conflict', message, { requestId: 'req_3' })],
+		});
+
+		const error = await catchError(dattaCrmRequest.call(ctx, 'POST', '/leads', {}));
+
+		expect(error.message).toBe(message);
+		expect(error.description).toContain('req_3');
+	});
+
+	it('raises a clear error when a list response has no data array', async () => {
+		const { ctx } = createExecuteContext({
+			responses: [{ statusCode: 200, body: { data: { id: '1' } }, headers: {} }],
+		});
+
+		const error = await catchError(dattaCrmRequestPage.call(ctx, '/leads'));
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error.message).toBe('Unexpected response from Datta CRM');
+	});
+
 	it('lists validation details in the description', async () => {
 		const { ctx } = createExecuteContext({
 			responses: [
@@ -185,6 +208,14 @@ describe('dattaCrmRequestAll', () => {
 		expect(request).toHaveBeenCalledTimes(2);
 		expect(request.mock.calls[0][1].qs).toEqual({ limit: 200 });
 		expect(request.mock.calls[1][1].qs).toEqual({ limit: 50, cursor: 'A' });
+	});
+
+	it('returns an empty list without a request when max is zero or negative', async () => {
+		const { ctx, request } = createExecuteContext({ responses: [page([{ id: '1' }], null)] });
+
+		expect(await dattaCrmRequestAll.call(ctx, '/leads', {}, 0)).toEqual([]);
+		expect(await dattaCrmRequestAll.call(ctx, '/leads', {}, -5)).toEqual([]);
+		expect(request).not.toHaveBeenCalled();
 	});
 
 	it('truncates when the server returns more than requested', async () => {
