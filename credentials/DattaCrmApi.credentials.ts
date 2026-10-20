@@ -26,6 +26,9 @@ export class DattaCrmApi implements ICredentialType {
 			typeOptions: { password: true },
 			required: true,
 			default: '',
+			placeholder: 'crm_live_...',
+			description:
+				'Create a key in Datta CRM under Integrations → API. Each key belongs to one account.',
 		},
 		{
 			displayName: 'Base URL',
@@ -33,6 +36,7 @@ export class DattaCrmApi implements ICredentialType {
 			type: 'string',
 			default: 'https://crm.agenciadatta.com.br',
 			required: true,
+			description: 'Only change this if you were given a different Datta CRM address.',
 		},
 	];
 
@@ -48,7 +52,7 @@ export class DattaCrmApi implements ICredentialType {
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: '={{$credentials.baseUrl.replace(/[/]+$/, "")}}/api/v1',
-			url: '/pipelines',
+			url: '/me',
 		},
 	};
 }
