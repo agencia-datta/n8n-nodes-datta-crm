@@ -11,6 +11,7 @@ import {
 
 export type DattaCrmContext = IExecuteFunctions | ILoadOptionsFunctions | IHookFunctions;
 
+/** Largest `limit` of `GET /leads`, `/sales` and `/forms`. `/email-campaigns` allows only 50. */
 const MAX_PAGE_SIZE = 200;
 
 export function apiUrl(baseUrl: string, path: string): string {
@@ -159,19 +160,24 @@ export async function dattaCrmRequestPage(
 	return { items: data as IDataObject[], nextCursor };
 }
 
-/** Follows `nextCursor` until the end of the list, or until `max` items were collected. */
+/**
+ * Follows `nextCursor` until the end of the list, or until `max` items were collected. `pageSize`
+ * is the largest `limit` the endpoint accepts (200 unless the caller passes a smaller one).
+ */
 export async function dattaCrmRequestAll(
 	this: DattaCrmContext,
 	path: string,
 	qs: IDataObject = {},
 	max?: number,
+	pageSize: number = MAX_PAGE_SIZE,
 ): Promise<IDataObject[]> {
 	if (max !== undefined && max <= 0) return [];
+	const pageLimit = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(pageSize)));
 	const all: IDataObject[] = [];
 	let cursor: string | null = null;
 	do {
-		const remaining = max === undefined ? MAX_PAGE_SIZE : max - all.length;
-		const limit = Math.min(MAX_PAGE_SIZE, remaining);
+		const remaining = max === undefined ? pageLimit : max - all.length;
+		const limit = Math.min(pageLimit, remaining);
 		const query: IDataObject = { ...qs, limit };
 		if (cursor !== null) query.cursor = cursor;
 		const { items, nextCursor } = await dattaCrmRequestPage.call(this, path, query);

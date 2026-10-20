@@ -101,6 +101,7 @@ describe('Sale: Create or Update', () => {
 				},
 			},
 			[ok({ sale: sale(), result: 'created' })],
+			{ timezone: 'America/Sao_Paulo' },
 		);
 
 		expect(calls[0].body).toEqual({
@@ -112,7 +113,7 @@ describe('Sale: Create or Update', () => {
 			productId: 'p1',
 			productName: 'Course',
 			paymentType: 'card',
-			occurredAt: new Date('2026-10-20T10:00:00').toISOString(),
+			occurredAt: '2026-10-20T13:00:00.000Z',
 			buyer: { name: 'Ana', email: 'ana@example.com' },
 			utm: { source: 'g', campaign: 'c' },
 			mirror: {
@@ -131,7 +132,7 @@ describe('Sale: Create or Update', () => {
 				couponCode: 'C10',
 				installments: 3,
 				payoutCurrency: 'USD',
-				approvedAt: new Date('2026-10-21T08:30:00').toISOString(),
+				approvedAt: '2026-10-21T11:30:00.000Z',
 			},
 		});
 	});
@@ -214,6 +215,38 @@ describe('Sale: Get, Get Many and Update', () => {
 		);
 
 		expect(calls[0].qs).toEqual({ limit: 7 });
+	});
+
+	it('reads zone-less dates in the workflow timezone', async () => {
+		const { calls } = await run(
+			[
+				{
+					resource: 'sale',
+					operation: 'getAll',
+					returnAll: false,
+					limit: 1,
+					filters: { occurredSince: '2026-10-20T10:05:00' },
+				},
+				{
+					resource: 'sale',
+					operation: 'upsert',
+					transactionId: 'tx1',
+					status: 'paid',
+					value: 1,
+					additionalFields: {
+						occurredAt: '2026-10-20T10:05:00',
+						mirror: { approvedAt: '2026-10-20T10:05:00+03:00' },
+					},
+				},
+			],
+			[page([], null), ok({ sale: sale(), result: 'created', leadId: null }, undefined, 201)],
+			{ timezone: 'America/Sao_Paulo' },
+		);
+
+		expect(calls[0].qs).toEqual({ occurredSince: '2026-10-20T13:05:00.000Z', limit: 1 });
+		const body = calls[1].body as { occurredAt: string; mirror: { approvedAt: string } };
+		expect(body.occurredAt).toBe('2026-10-20T13:05:00.000Z');
+		expect(body.mirror.approvedAt).toBe('2026-10-20T07:05:00.000Z');
 	});
 
 	it('Update patches only the chosen fields and never sends gateway or transactionId', async () => {
@@ -482,6 +515,7 @@ describe('Email Campaign', () => {
 				},
 			},
 			[ok(campaign(), undefined, 201)],
+			{ timezone: 'America/Sao_Paulo' },
 		);
 
 		expect(calls[0]).toMatchObject({ method: 'POST', url: `${BASE}/email-campaigns` });
@@ -495,7 +529,7 @@ describe('Email Campaign', () => {
 			excludeListIds: ['l3'],
 			includeTags: ['vip'],
 			utm: { enabled: true, source: 'crm', campaign: 'news' },
-			desiredSendAt: new Date('2026-11-01T09:00:00').toISOString(),
+			desiredSendAt: '2026-11-01T12:00:00.000Z',
 		});
 		expect(items.map((i) => i.json)).toEqual([campaign()]);
 	});
@@ -612,10 +646,22 @@ describe('Email Campaign', () => {
 		expect(calls[0]).toMatchObject({
 			method: 'GET',
 			url: `${BASE}/email-campaigns`,
-			qs: { state: 'scheduled', limit: 200 },
+			qs: { state: 'scheduled', limit: 50 },
 		});
-		expect(calls[1].qs).toMatchObject({ state: 'scheduled', cursor: 'n1' });
+		expect(calls[1].qs).toMatchObject({ state: 'scheduled', cursor: 'n1', limit: 50 });
 		expect(items).toHaveLength(2);
+	});
+
+	it('Get Many never asks for more than 50 per page, even for a larger Limit', async () => {
+		const full = (prefix: string) =>
+			Array.from({ length: 50 }, (_, n) => campaign({ id: `${prefix}${n}` }));
+		const { items, calls } = await run(
+			{ resource: 'emailCampaign', operation: 'getAll', returnAll: false, limit: 120 },
+			[page(full('a'), 'n1'), page(full('b'), 'n2'), page(full('c'), 'n3')],
+		);
+
+		expect(calls.map((call) => (call.qs as { limit: number }).limit)).toEqual([50, 50, 20]);
+		expect(items).toHaveLength(120);
 	});
 });
 

@@ -51,8 +51,18 @@ export class DattaCrmApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials.baseUrl.replace(/[/]+$/, "")}}/api/v1',
+			baseURL: '={{$credentials.baseUrl.trim().replace(/[/]+$/, "")}}/api/v1',
 			url: '/me',
 		},
+		rules: [
+			{
+				type: 'responseCode',
+				properties: {
+					value: 401,
+					message:
+						'Invalid, expired or revoked API key. Check it in Datta CRM under Integrations → API.',
+				},
+			},
+		],
 	};
 }

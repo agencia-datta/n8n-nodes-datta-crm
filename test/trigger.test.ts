@@ -67,7 +67,13 @@ describe('description', () => {
 		expect(description.inputs).toEqual([]);
 		expect(description.credentials).toEqual([{ name: 'dattaCrmApi', required: true }]);
 		expect(description.webhooks).toEqual([
-			{ name: 'default', httpMethod: 'POST', responseMode: 'onReceived', path: 'webhook' },
+			{
+				name: 'default',
+				httpMethod: 'POST',
+				responseMode: 'onReceived',
+				responseData: 'noData',
+				path: 'webhook',
+			},
 		]);
 	});
 
@@ -202,6 +208,7 @@ describe('checkExists', () => {
 });
 
 describe('create', () => {
+	const otherUrl = 'https://n8n.example.com/webhook-test/other';
 	it('posts the expected body and stores the id and secret under the URL', async () => {
 		const { ctx, staticData, request } = hook({
 			params: {
@@ -209,10 +216,10 @@ describe('create', () => {
 				filters: { productId: 'p1, p2', pipelineId: ['pipe-1'] },
 			},
 			workflow: { id: 'wf-1', name: 'My workflow', active: true },
-			responses: [created('wh-9', 'whsec_abc')],
+			responses: [ok([]), created('wh-9', 'whsec_abc')],
 		});
 		expect(await methods.create.call(ctx)).toBe(true);
-		expect(requestOptions(request, 0)).toMatchObject({
+		expect(requestOptions(request, 1)).toMatchObject({
 			method: 'POST',
 			url: 'https://crm.example.com/api/v1/webhooks',
 			body: {
@@ -232,10 +239,10 @@ describe('create', () => {
 	it('omits filters when none are set and honours ignoreOwnChanges false', async () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'], ignoreOwnChanges: false },
-			responses: [created('wh-1', 's')],
+			responses: [ok([]), created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
-		const body = requestOptions(request, 0).body as Record<string, unknown>;
+		const body = requestOptions(request, 1).body as Record<string, unknown>;
 		expect(body).not.toHaveProperty('filters');
 		expect(body.ignoreOwnChanges).toBe(false);
 	});
@@ -244,10 +251,10 @@ describe('create', () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'] },
 			workflow: { id: 'wf-1', name: 'a'.repeat(73) + ' tail words', active: true },
-			responses: [created('wh-1', 's')],
+			responses: [ok([]), created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
-		const name = (requestOptions(request, 0).body as { name: string }).name;
+		const name = (requestOptions(request, 1).body as { name: string }).name;
 		expect(name).toBe('n8n · ' + 'a'.repeat(73));
 		expect(Array.from(name)).toHaveLength(79);
 	});
@@ -256,10 +263,10 @@ describe('create', () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'] },
 			workflow: { id: 'wf-1', name: '\u{1F600}'.repeat(100), active: true },
-			responses: [created('wh-1', 's')],
+			responses: [ok([]), created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
-		const name = (requestOptions(request, 0).body as { name: string }).name;
+		const name = (requestOptions(request, 1).body as { name: string }).name;
 		expect(name).toBe('n8n · ' + '\u{1F600}'.repeat(74));
 		expect(Array.from(name)).toHaveLength(80);
 		expect(name.isWellFormed()).toBe(true);
@@ -269,10 +276,10 @@ describe('create', () => {
 		const { ctx, request } = hook({
 			params: { events: ['lead.created'] },
 			workflow: { id: 'wf-1', name: '', active: true },
-			responses: [created('wh-1', 's')],
+			responses: [ok([]), created('wh-1', 's')],
 		});
 		await methods.create.call(ctx);
-		expect((requestOptions(request, 0).body as { name: string }).name).toBe('n8n');
+		expect((requestOptions(request, 1).body as { name: string }).name).toBe('n8n');
 	});
 
 	it('throws before calling the API when no event is selected', async () => {
@@ -286,7 +293,10 @@ describe('create', () => {
 	it('lets an API error propagate and stores nothing', async () => {
 		const { ctx, staticData } = hook({
 			params: { events: ['lead.created'] },
-			responses: [apiError(400, 'validation_error', 'invalid_target_url: use HTTPS on port 443.')],
+			responses: [
+				ok([]),
+				apiError(400, 'validation_error', 'invalid_target_url: use HTTPS on port 443.'),
+			],
 		});
 		await expect(methods.create.call(ctx)).rejects.toMatchObject({
 			message: 'invalid_target_url: use HTTPS on port 443.',
@@ -304,12 +314,86 @@ describe('create', () => {
 	])('raises a clear error and stores nothing when the response has %s', async (_label, data) => {
 		const { ctx, staticData } = hook({
 			params: { events: ['lead.created'] },
-			responses: [ok(data, undefined, 201)],
+			responses: [ok([]), ok(data, undefined, 201)],
 		});
 		const failure = await methods.create.call(ctx).catch((error: unknown) => error);
 		expect(failure).toBeInstanceOf(NodeApiError);
 		expect((failure as NodeApiError).message).toBe('Unexpected response from Datta CRM');
 		expect(staticData).toEqual({});
+	});
+
+	it('deletes stale webhooks registered for the same URL before creating', async () => {
+		const { ctx, staticData, request } = hook({
+			params: { events: ['lead.created'] },
+			responses: [
+				ok([
+					webhook({ id: 'stale-1' }),
+					webhook({ id: 'other-url', targetUrl: otherUrl }),
+					webhook({ id: 'stale-2', status: 'paused' }),
+				]),
+				ok({ deleted: true, id: 'stale-1' }),
+				ok({ deleted: true, id: 'stale-2' }),
+				created('wh-new', 'whsec_new'),
+			],
+		});
+		expect(await methods.create.call(ctx)).toBe(true);
+
+		const calls = request.mock.calls.map((call) => call[1] as { method: string; url: string });
+		expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+			'GET https://crm.example.com/api/v1/webhooks',
+			'DELETE https://crm.example.com/api/v1/webhooks/stale-1',
+			'DELETE https://crm.example.com/api/v1/webhooks/stale-2',
+			'POST https://crm.example.com/api/v1/webhooks',
+		]);
+		expect(staticData).toEqual(seeded('wh-new', 'whsec_new'));
+	});
+
+	it('never touches webhooks of other URLs', async () => {
+		const { ctx, request } = hook({
+			params: { events: ['lead.created'] },
+			responses: [
+				ok([
+					webhook({ id: 'prod', targetUrl: 'https://n8n.example.com/webhook/abc/' }),
+					webhook({ id: 'test', targetUrl: otherUrl }),
+				]),
+				created('wh-new', 's'),
+			],
+		});
+		await methods.create.call(ctx);
+		const methodsCalled = request.mock.calls.map((call) => (call[1] as { method: string }).method);
+		expect(methodsCalled).toEqual(['GET', 'POST']);
+	});
+
+	it('ignores a 404 when deleting a stale webhook', async () => {
+		const { ctx, staticData } = hook({
+			params: { events: ['lead.created'] },
+			responses: [
+				ok([webhook({ id: 'gone' })]),
+				apiError(404, 'not_found', 'Webhook não encontrado.'),
+				created('wh-new', 's'),
+			],
+		});
+		expect(await methods.create.call(ctx)).toBe(true);
+		expect(staticData).toEqual(seeded('wh-new', 's'));
+	});
+
+	it('does not create when a stale webhook cannot be deleted', async () => {
+		const { ctx, request, staticData } = hook({
+			params: { events: ['lead.created'] },
+			responses: [ok([webhook({ id: 'stale' })]), apiError(500, 'internal_error', 'Erro interno.')],
+		});
+		await expect(methods.create.call(ctx)).rejects.toMatchObject({ message: 'Erro interno.' });
+		expect(request).toHaveBeenCalledTimes(2);
+		expect(staticData).toEqual({});
+	});
+
+	it('raises a clear error when GET /webhooks does not return a list', async () => {
+		const { ctx, request } = hook({
+			params: { events: ['lead.created'] },
+			responses: [ok({ not: 'a list' })],
+		});
+		await expect(methods.create.call(ctx)).rejects.toThrow('Unexpected response from Datta CRM');
+		expect(request).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -385,7 +469,7 @@ describe('test and production URLs share static data', () => {
 			webhookUrl: TEST_URL,
 			staticData,
 			params: { events: ['lead.created'] },
-			responses: [created('wh-test', testSecret, TEST_URL)],
+			responses: [ok([]), created('wh-test', testSecret, TEST_URL)],
 		});
 		expect(await methods.create.call(second.ctx)).toBe(true);
 		expect(staticData.webhooks).toEqual({

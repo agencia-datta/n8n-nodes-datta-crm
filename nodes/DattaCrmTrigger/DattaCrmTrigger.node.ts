@@ -140,6 +140,23 @@ async function deleteRemoteWebhook(context: IHookFunctions, id: string): Promise
 	}
 }
 
+/**
+ * Removes every webhook registered for exactly `url`. n8n replaces a test registration (listening
+ * for a test event twice) without calling `delete`, which would leave the first one orphaned in the
+ * CRM, still delivering to a URL that no longer has a secret. Other URLs are never touched.
+ */
+async function deleteWebhooksForUrl(context: IHookFunctions, url: string): Promise<void> {
+	const webhooks = (await dattaCrmRequest.call(context, 'GET', '/webhooks')) as unknown;
+	if (!Array.isArray(webhooks)) {
+		throw unexpectedResponse(context, 'Expected a list in "data" for GET /webhooks.');
+	}
+	for (const webhook of webhooks as StoredWebhook[]) {
+		if (webhook.targetUrl === url && typeof webhook.id === 'string' && webhook.id !== '') {
+			await deleteRemoteWebhook(context, webhook.id);
+		}
+	}
+}
+
 export class DattaCrmTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Datta CRM Trigger',
@@ -160,6 +177,8 @@ export class DattaCrmTrigger implements INodeType {
 				name: 'default',
 				httpMethod: 'POST',
 				responseMode: 'onReceived',
+				// The CRM only needs a 2xx. Without this n8n answers with the literal text "firstEntryJson".
+				responseData: 'noData',
 				path: 'webhook',
 			},
 		],
@@ -278,6 +297,7 @@ export class DattaCrmTrigger implements INodeType {
 					});
 				}
 				const url = this.getNodeWebhookUrl('default');
+				if (url !== undefined) await deleteWebhooksForUrl(this, url);
 				const filters = buildFilters(events, this.getNodeParameter('filters', {}) as IDataObject);
 				const body: IDataObject = {
 					targetUrl: url,

@@ -29,22 +29,22 @@ Restart n8n afterwards. See the [n8n community nodes documentation](https://docs
 1. In Datta CRM, open **Integrations → API** and create an API key. Each key belongs to one account. Keys can expire. Revoking a key (or letting it expire) also stops the webhooks that were created with it.
 2. In n8n, create a **Datta CRM API** credential:
 
-| Field | Description |
-| --- | --- |
-| API Key | The key you created. |
+| Field    | Description                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| API Key  | The key you created.                                                                                 |
 | Base URL | Defaults to `https://crm.agenciadatta.com.br`. Only change it if you were given a different address. |
 
 The credential test calls `GET /api/v1/me`.
 
 ## Datta CRM node
 
-| Resource | Operations |
-| --- | --- |
-| Lead | Create or Update, Get, Get Many, Update, Move to Stage, Add Tags, Remove Tags, Add to Lists, Remove From Lists |
-| List | Create, Get Many |
-| Sale | Create or Update, Get, Get Many, Update |
-| Form | Create, Get, Get Many, Update, Activate, Deactivate |
-| Email Campaign | Create Draft, Get, Get Many, Update Draft |
+| Resource       | Operations                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Lead           | Create or Update, Get, Get Many, Update, Move to Stage, Add Tags, Remove Tags, Add to Lists, Remove From Lists |
+| List           | Create, Get Many                                                                                               |
+| Sale           | Create or Update, Get, Get Many, Update                                                                        |
+| Form           | Create, Get, Get Many, Update, Activate, Deactivate                                                            |
+| Email Campaign | Create Draft, Get, Get Many, Update Draft                                                                      |
 
 Pipelines, stages, tags, lists, forms, members, custom fields and webhook events are loaded from your account, so you pick them from dropdowns. You can also pass IDs with an expression.
 
@@ -55,6 +55,7 @@ Pipelines, stages, tags, lists, forms, members, custom fields and webhook events
 - **Custom fields** are chosen by key. Values are converted to the type the CRM defines for each field: number, yes/no (`true`/`false`, `1`/`0`, `yes`/`no`), multiple choice (comma-separated values) or text. An invalid number or yes/no value fails the item with a clear message.
 - **Get (Lead)** can search by lead ID, email or phone. When searching by email or phone it returns the first match, or no item when nothing matches.
 - **Get Many** has Return All and Limit. With Return All the node follows the API cursor until there are no more results. Lists (Get Many) are not paginated by the API.
+- **Dates** without a time zone (what date pickers give) are read in the workflow time zone (Settings → Timezone). A value with an explicit zone or offset, such as `2026-10-20T10:00:00Z`, keeps it.
 - **Create or Update (Sale)** matches an existing sale by gateway and transaction ID (the gateway defaults to `api`) and updates only the fields you send. **Update (Sale)** cannot change the gateway or transaction ID.
 - **Forms**: Create takes the questions as a JSON array. Update takes a JSON object with only the fields to change. Activate and Deactivate turn the form on or off.
 - **Email campaigns** are drafts only. The node never sends an email: review and schedule the draft in Datta CRM. Update Draft ignores empty values, and a campaign that is no longer a draft returns a conflict error.
@@ -68,14 +69,14 @@ The trigger registers a webhook in your CRM account when the workflow is activat
 - **Ignore Changes Made by This API Key** (on by default): skips events caused by the credential used by the trigger. Keep it on if the workflow writes back to Datta CRM with the same credential, to avoid loops.
 - **HTTPS on port 443**: Datta CRM only delivers to `https://` URLs on port 443. It also refuses private and loopback addresses. A local n8n needs a public HTTPS URL, for example through a tunnel.
 - **Signature**: every delivery is signed with `x-crm-signature` (HMAC-SHA256 of the raw body). The node verifies it automatically and answers `401` to deliveries with an invalid signature, which do not start the workflow.
-- **Test and production**: n8n has a separate test URL and production URL for the same node. The trigger keeps one webhook for each, so the two listeners are independent.
+- **Test and production**: n8n has a separate test URL and production URL for the same node. The trigger keeps one webhook for each, so the two listeners are independent. Listening for a test event again first removes the CRM webhook left by the previous listen for that same test URL.
 - **Limits**: an account can have up to 50 webhooks. Webhooks created by a key stop working when that key is revoked or expires; update the credential with a new key and reactivate the workflow.
 
 The workflow receives the delivery body: event id, event name, timestamps, organization, actor, `data` and, when available, `previous`.
 
 ## Errors and rate limits
 
-When the API returns an error, the node shows the CRM message (which explains how to fix it) and the error code. Validation errors list the fields that failed. Enable **Continue On Fail** on the node to handle errors in the workflow.
+When the API returns an error, the node shows the CRM message (which explains how to fix it) and the error code. Validation errors list the fields that failed. Enable **Continue On Fail** on the node to handle errors in the workflow: the failed item has `error` (the message) and, when available, `description` (code, request ID and validation details).
 
 The API allows 120 calls per minute per key. Above that it answers `429` (`rate_limited`) with a `Retry-After` header. Enable **Retry On Fail** in the node settings to retry automatically, and use Get Many instead of looping over single requests where you can.
 
@@ -91,7 +92,11 @@ npm run build
 
 ## Releasing
 
-Releases are published only by GitHub Actions, never from a local machine. A maintainer pushes a tag named `X.Y.Z` (no `v` prefix, for example `0.1.0`) on `main`, after the version in `package.json` and `CHANGELOG.md` are updated. The `.github/workflows/publish.yml` workflow then runs the tests, lint and build and runs `npm publish` with provenance.
+Releases are published only by GitHub Actions, never from a local machine.
+
+Pushing a tag named `X.Y.Z` (no `v` prefix, for example `0.1.0`) runs `.github/workflows/publish.yml`. The workflow runs `npm ci --ignore-scripts` and `npm test`, then `npm run release`, which runs lint, build and `npm publish` with npm provenance.
+
+Maintainers can start a release locally with `npm run release`. release-it runs lint and build, asks for the version bump, updates `CHANGELOG.md`, commits, tags and pushes, and creates the GitHub release. It does not publish to npm; pushing the tag is what triggers the workflow above.
 
 ## License
 

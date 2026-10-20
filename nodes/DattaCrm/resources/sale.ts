@@ -174,7 +174,7 @@ const sharedOptions: Record<
 		name: 'occurredAt',
 		type: 'dateTime',
 		default: '',
-		description: 'When the sale happened. Defaults to now.',
+		description: 'When the sale happened',
 	},
 	paymentType: {
 		displayName: 'Payment Type',

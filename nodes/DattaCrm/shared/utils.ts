@@ -39,8 +39,49 @@ export function compact(source: IDataObject): IDataObject {
 	return result;
 }
 
+const ZONELESS_DATE =
+	/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:[.,](\d{1,9}))?)?)?$/;
+
+/** Milliseconds that `timeZone` is ahead of UTC at the instant `instant` (epoch ms). */
+function zoneOffsetMs(timeZone: string, instant: number): number {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		hourCycle: 'h23',
+		year: 'numeric',
+		month: 'numeric',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: 'numeric',
+		second: 'numeric',
+	}).formatToParts(new Date(instant));
+	const part = (type: string): number =>
+		Number(parts.find((candidate) => candidate.type === type)?.value);
+	const wallClock = Date.UTC(
+		part('year'),
+		part('month') - 1,
+		part('day'),
+		part('hour'),
+		part('minute'),
+		part('second'),
+	);
+	// Drop the milliseconds of the instant: the formatter only reports whole seconds.
+	return wallClock - Math.floor(instant / 1000) * 1000;
+}
+
 /**
- * Converts the value of an n8n date/time parameter (with or without a zone) into an ISO string.
+ * The instant at which the wall clock of `timeZone` shows `wallClock` (given as if it were UTC).
+ * The offset is looked up twice so a date on the other side of a DST change is still right.
+ */
+function zonedWallClockToInstant(timeZone: string, wallClock: number): number {
+	const first = wallClock - zoneOffsetMs(timeZone, wallClock);
+	const second = wallClock - zoneOffsetMs(timeZone, first);
+	return second;
+}
+
+/**
+ * Converts the value of an n8n date/time parameter into an ISO (UTC) string. A value with an
+ * explicit zone or offset (`Z`, `+03:00`) keeps it; a value without one (what n8n date/time
+ * parameters give, such as `2026-10-20T10:05:00`) is read in the workflow timezone.
  * Returns `undefined` for an empty value and throws for an invalid one.
  */
 export function toIsoDate(
@@ -50,7 +91,38 @@ export function toIsoDate(
 	itemIndex: number,
 ): string | undefined {
 	if (value === undefined || value === null || value === '') return undefined;
-	const date = new Date(value as string | number | Date);
+	let date: Date;
+	const zoneless = typeof value === 'string' ? ZONELESS_DATE.exec(value.trim()) : null;
+	if (zoneless === null) {
+		date = new Date(value as string | number | Date);
+	} else {
+		const [, year, month, day, hour = '0', minute = '0', second = '0', fraction = '0'] = zoneless;
+		const wallClock = Date.UTC(
+			Number(year),
+			Number(month) - 1,
+			Number(day),
+			Number(hour),
+			Number(minute),
+			Number(second),
+			Number(fraction.padEnd(3, '0').slice(0, 3)),
+		);
+		const wellFormed =
+			new Date(wallClock).getUTCMonth() === Number(month) - 1 &&
+			new Date(wallClock).getUTCDate() === Number(day) &&
+			Number(hour) < 24 &&
+			Number(minute) < 60 &&
+			Number(second) < 60;
+		const timeZone = context.getTimezone();
+		try {
+			date = new Date(wellFormed ? zonedWallClockToInstant(timeZone, wallClock) : NaN);
+		} catch {
+			// Intl throws a RangeError for a time zone it does not know.
+			throw new NodeOperationError(context.getNode(), 'The workflow timezone is not valid', {
+				itemIndex,
+				description: `Unknown timezone "${timeZone}".`,
+			});
+		}
+	}
 	if (Number.isNaN(date.getTime())) {
 		throw new NodeOperationError(context.getNode(), `"${fieldName}" is not a valid date`, {
 			itemIndex,
@@ -143,16 +215,20 @@ export function idPath(
 	return `${base}/${encodeURIComponent(id)}`;
 }
 
-/** Get Many: reads Return All / Limit and follows the cursors of a paginated list. */
+/**
+ * Get Many: reads Return All / Limit and follows the cursors of a paginated list. `pageSize` is the
+ * largest page the endpoint accepts (default 200; email campaigns allow 50).
+ */
 export async function fetchMany(
 	context: IExecuteFunctions,
 	itemIndex: number,
 	path: string,
 	qs: IDataObject,
+	pageSize?: number,
 ): Promise<IDataObject[]> {
 	const returnAll = context.getNodeParameter('returnAll', itemIndex, false) as boolean;
 	const max = returnAll ? undefined : (context.getNodeParameter('limit', itemIndex, 50) as number);
-	return dattaCrmRequestAll.call(context, path, qs, max);
+	return dattaCrmRequestAll.call(context, path, qs, max, pageSize);
 }
 
 /** Throws unless the request body has at least one key. */

@@ -2,6 +2,7 @@ import {
 	NodeApiError,
 	NodeConnectionTypes,
 	NodeOperationError,
+	type IDataObject,
 	type IExecuteFunctions,
 	type INodeExecutionData,
 	type INodeType,
@@ -111,7 +112,14 @@ export class DattaCrm implements INodeType {
 				);
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: i } });
+					const { message, description } = error as {
+						message: string;
+						description?: string | null;
+					};
+					const json: IDataObject = { error: message };
+					// The API error description carries the code, request ID and validation details.
+					if (typeof description === 'string' && description !== '') json.description = description;
+					returnData.push({ json, pairedItem: { item: i } });
 					continue;
 				}
 				if (error instanceof NodeApiError) {

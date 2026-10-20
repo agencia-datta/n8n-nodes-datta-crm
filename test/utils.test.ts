@@ -53,11 +53,53 @@ describe('toIsoDate', () => {
 		expect(toIsoDate(ctx, '2026-10-20T10:00:00.000Z', 'Updated Since', 0)).toBe(
 			'2026-10-20T10:00:00.000Z',
 		);
-		expect(toIsoDate(ctx, '2026-10-20T10:00:00', 'Updated Since', 0)).toBe(
-			new Date('2026-10-20T10:00:00').toISOString(),
-		);
 		expect(toIsoDate(ctx, '', 'Updated Since', 0)).toBeUndefined();
 		expect(toIsoDate(ctx, undefined, 'Updated Since', 0)).toBeUndefined();
+	});
+
+	function iso(timezone: string, value: string): string | undefined {
+		const { ctx } = createExecuteContext({ timezone });
+		return toIsoDate(ctx, value, 'Occurred At', 0);
+	}
+
+	it('reads a zone-less value in the workflow timezone, not the OS one', () => {
+		expect(iso('UTC', '2026-10-20T10:05:00')).toBe('2026-10-20T10:05:00.000Z');
+		// Sao Paulo is UTC-3 all year since 2019.
+		expect(iso('America/Sao_Paulo', '2026-10-20T10:05:00')).toBe('2026-10-20T13:05:00.000Z');
+		expect(iso('America/Sao_Paulo', '2026-10-20T10:05:00.250')).toBe('2026-10-20T13:05:00.250Z');
+		expect(iso('America/Sao_Paulo', '2026-10-20 10:05')).toBe('2026-10-20T13:05:00.000Z');
+		expect(iso('Asia/Kolkata', '2026-10-20T10:05:00')).toBe('2026-10-20T04:35:00.000Z');
+		expect(iso('America/Sao_Paulo', '2026-10-20')).toBe('2026-10-20T03:00:00.000Z');
+	});
+
+	it('handles daylight saving time on both sides of a change', () => {
+		// US clocks jump forward on 2026-03-08 at 02:00 (EST UTC-5 -> EDT UTC-4).
+		expect(iso('America/New_York', '2026-03-08T01:30:00')).toBe('2026-03-08T06:30:00.000Z');
+		expect(iso('America/New_York', '2026-03-08T03:30:00')).toBe('2026-03-08T07:30:00.000Z');
+		expect(iso('America/New_York', '2026-03-07T12:00:00')).toBe('2026-03-07T17:00:00.000Z');
+		expect(iso('America/New_York', '2026-03-09T12:00:00')).toBe('2026-03-09T16:00:00.000Z');
+		// ... and back on 2026-11-01 at 02:00 (EDT -> EST).
+		expect(iso('America/New_York', '2026-11-01T00:30:00')).toBe('2026-11-01T04:30:00.000Z');
+		expect(iso('America/New_York', '2026-11-01T12:00:00')).toBe('2026-11-01T17:00:00.000Z');
+	});
+
+	it('keeps an explicit zone or offset whatever the workflow timezone is', () => {
+		expect(iso('America/Sao_Paulo', '2026-10-20T10:05:00Z')).toBe('2026-10-20T10:05:00.000Z');
+		expect(iso('America/Sao_Paulo', '2026-10-20T10:05:00+03:00')).toBe('2026-10-20T07:05:00.000Z');
+		expect(iso('America/New_York', '2026-10-20T10:05:00.000-02:00')).toBe(
+			'2026-10-20T12:05:00.000Z',
+		);
+	});
+
+	it('rejects an impossible zone-less date', () => {
+		expect(() => iso('UTC', '2026-02-30T10:00:00')).toThrow('is not a valid date');
+		expect(() => iso('UTC', '2026-10-20T25:00:00')).toThrow('is not a valid date');
+	});
+
+	it('throws a clear error for an unknown workflow timezone', () => {
+		expect(() => iso('Mars/Olympus', '2026-10-20T10:00:00')).toThrow(
+			'The workflow timezone is not valid',
+		);
 	});
 
 	it('throws a NodeOperationError for an invalid date', () => {

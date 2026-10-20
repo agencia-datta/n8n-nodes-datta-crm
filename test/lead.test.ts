@@ -140,19 +140,36 @@ describe('Lead: Create or Update', () => {
 
 		expect(request).not.toHaveBeenCalled();
 		expect(items).toEqual([
-			{ json: { error: 'Provide an email or a phone' }, pairedItem: { item: 0 } },
+			{
+				json: {
+					error: 'Provide an email or a phone',
+					description: 'The CRM matches and creates leads by phone or email.',
+				},
+				pairedItem: { item: 0 },
+			},
 		]);
 	});
 
-	it('with continueOnFail returns the API message for an API error', async () => {
+	it('with continueOnFail returns the API message and its description for an API error', async () => {
 		const { items } = await run(
 			{ resource: 'lead', operation: 'upsert', email: 'ana@example.com' },
-			[apiError(400, 'validation_error', 'Informe um e-mail válido.')],
+			[
+				apiError(400, 'validation_error', 'Informe um e-mail válido.', {
+					requestId: 'req_42',
+					details: [{ path: 'email', message: 'e-mail inválido' }],
+				}),
+			],
 			{ continueOnFail: true },
 		);
 
 		expect(items).toEqual([
-			{ json: { error: 'Informe um e-mail válido.' }, pairedItem: { item: 0 } },
+			{
+				json: {
+					error: 'Informe um e-mail válido.',
+					description: 'code: validation_error · requestId: req_42\nemail: e-mail inválido',
+				},
+				pairedItem: { item: 0 },
+			},
 		]);
 	});
 
@@ -282,6 +299,7 @@ describe('Lead: Get Many', () => {
 				},
 			},
 			[page([], null)],
+			{ timezone: 'America/Sao_Paulo' },
 		);
 
 		expect(calls[0].qs).toEqual({
@@ -291,7 +309,7 @@ describe('Lead: Get Many', () => {
 			listId: 'l1',
 			pipelineId: 'p1',
 			stageId: 's1',
-			updatedSince: new Date('2026-10-20T10:00:00').toISOString(),
+			updatedSince: '2026-10-20T13:00:00.000Z',
 			limit: 5,
 		});
 	});

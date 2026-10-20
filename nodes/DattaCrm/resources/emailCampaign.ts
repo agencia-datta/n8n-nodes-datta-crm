@@ -328,7 +328,8 @@ async function getCampaign(this: IExecuteFunctions, i: number): Promise<IDataObj
 
 async function getManyCampaigns(this: IExecuteFunctions, i: number): Promise<IDataObject[]> {
 	const filters = this.getNodeParameter('filters', i, {}) as IDataObject;
-	return fetchMany(this, i, '/email-campaigns', compact({ state: filters.state }));
+	// GET /email-campaigns accepts at most 50 per page (the other lists accept 200).
+	return fetchMany(this, i, '/email-campaigns', compact({ state: filters.state }), 50);
 }
 
 const operations: Record<string, ResourceExecutor> = {

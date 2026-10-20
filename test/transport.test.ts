@@ -210,6 +210,19 @@ describe('dattaCrmRequestAll', () => {
 		expect(request.mock.calls[1][1].qs).toEqual({ limit: 50, cursor: 'A' });
 	});
 
+	it('pages with a smaller pageSize and never exceeds the 200 default', async () => {
+		const { ctx, request } = createExecuteContext({
+			responses: [page([{ id: '1' }], 'A'), page([{ id: '2' }], 'B'), page([{ id: '3' }], null)],
+		});
+
+		await dattaCrmRequestAll.call(ctx, '/email-campaigns', {}, undefined, 50);
+		expect(request.mock.calls.map((call) => call[1].qs.limit)).toEqual([50, 50, 50]);
+
+		const capped = createExecuteContext({ responses: [page([{ id: '1' }], null)] });
+		await dattaCrmRequestAll.call(capped.ctx, '/leads', {}, undefined, 500);
+		expect(capped.request.mock.calls[0][1].qs).toEqual({ limit: 200 });
+	});
+
 	it('returns an empty list without a request when max is zero or negative', async () => {
 		const { ctx, request } = createExecuteContext({ responses: [page([{ id: '1' }], null)] });
 

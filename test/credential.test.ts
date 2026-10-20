@@ -91,7 +91,7 @@ describe('DattaCrmApi credential', () => {
 		expect(header).toBe('Bearer crm_live_x');
 	});
 
-	it('tests the credential against GET /me with trailing slashes stripped', () => {
+	it('tests the credential against GET /me with whitespace and trailing slashes stripped', () => {
 		const request = credential.test.request;
 		expect(request.url).toBe('/me');
 		const baseURL = request.baseURL as string;
@@ -101,5 +101,21 @@ describe('DattaCrmApi credential', () => {
 		expect(evaluate(baseURL, { baseUrl: 'https://crm.example.com//' })).toBe(
 			'https://crm.example.com/api/v1',
 		);
+		expect(evaluate(baseURL, { baseUrl: '  https://crm.example.com/ ' })).toBe(
+			'https://crm.example.com/api/v1',
+		);
+	});
+
+	it('explains a 401 in the credential test instead of showing "Unauthorized"', () => {
+		expect(credential.test.rules).toEqual([
+			{
+				type: 'responseCode',
+				properties: {
+					value: 401,
+					message:
+						'Invalid, expired or revoked API key. Check it in Datta CRM under Integrations → API.',
+				},
+			},
+		]);
 	});
 });

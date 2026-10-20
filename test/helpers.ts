@@ -28,6 +28,8 @@ export interface ContextOptions {
 	/** Responses handed out in order by `httpRequestWithAuthentication`. */
 	responses?: QueuedResponse[];
 	continueOnFail?: boolean;
+	/** Workflow timezone returned by `getTimezone()` (execute context). Defaults to UTC. */
+	timezone?: string;
 	/** Input items for `getInputData()` (execute context). Defaults to one empty item per params entry. */
 	items?: INodeExecutionData[];
 	/** Values `getCurrentNodeParameter(name)` returns in the load-options context (dotted names). */
@@ -176,6 +178,7 @@ export function createExecuteContext(options: ContextOptions = {}): ExecuteMock 
 		...base,
 		getNodeParameter: vi.fn(makeExecuteGetNodeParameter(options.params ?? {})),
 		getInputData: () => items,
+		getTimezone: () => options.timezone ?? 'UTC',
 		continueOnFail: () => options.continueOnFail ?? false,
 		helpers: {
 			...base.helpers,
