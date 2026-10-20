@@ -126,6 +126,10 @@ function makeContextGetNodeParameter(params: Params | Params[]) {
 	};
 }
 
+function returnJsonArray(data: IDataObject | IDataObject[]): INodeExecutionData[] {
+	return (Array.isArray(data) ? data : [data]).map((json) => ({ json }));
+}
+
 function makeRequestMock(responses: QueuedResponse[]): Mock {
 	const queue = [...responses];
 	return vi.fn(async () => {
@@ -175,8 +179,7 @@ export function createExecuteContext(options: ContextOptions = {}): ExecuteMock 
 		continueOnFail: () => options.continueOnFail ?? false,
 		helpers: {
 			...base.helpers,
-			returnJsonArray: (data: IDataObject | IDataObject[]): INodeExecutionData[] =>
-				(Array.isArray(data) ? data : [data]).map((json) => ({ json })),
+			returnJsonArray,
 			constructExecutionMetaData: (
 				input: INodeExecutionData[],
 				meta: { itemData: { item: number } | Array<{ item: number }> },
@@ -214,19 +217,23 @@ export interface HookMock {
 	ctx: IHookFunctions;
 	request: Mock;
 	staticData: IDataObject;
+	/** `ctx.logger` methods, as mocks. */
+	logger: Record<'error' | 'warn' | 'info' | 'debug', Mock>;
 }
 
 /** Mock `IHookFunctions` (webhookMethods checkExists/create/delete). */
 export function createHookContext(options: HookOptions = {}): HookMock {
 	const base = buildBase(options);
 	const staticData = options.staticData ?? {};
+	const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
 	const ctx = {
 		...base,
 		getNodeWebhookUrl: vi.fn(() => options.webhookUrl ?? 'https://n8n.example.com/webhook/abc'),
 		getWorkflow: () => options.workflow ?? { id: 'wf-1', name: 'Workflow', active: true },
 		getWorkflowStaticData: vi.fn(() => staticData),
+		logger,
 	};
-	return { ctx: ctx as unknown as IHookFunctions, request: base.request, staticData };
+	return { ctx: ctx as unknown as IHookFunctions, request: base.request, staticData, logger };
 }
 
 export interface WebhookOptions extends HookOptions {
@@ -267,8 +274,10 @@ export function createWebhookContext(options: WebhookOptions = {}): WebhookMock 
 			return res;
 		},
 	};
+	const hookCtx = hook.ctx as unknown as { helpers: Record<string, unknown> };
 	const ctx = {
 		...(hook.ctx as unknown as Record<string, unknown>),
+		helpers: { ...hookCtx.helpers, returnJsonArray },
 		getRequestObject: () => ({
 			body: req.body ?? {},
 			rawBody: req.rawBody,

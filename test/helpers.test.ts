@@ -61,4 +61,14 @@ describe('getNodeParameter in the mock contexts', () => {
 
 		expect(ctx.getNodeParameter('missing', 0, undefined)).toBeUndefined();
 	});
+
+	it('webhook: exposes returnJsonArray like n8n', () => {
+		const { ctx } = createWebhookContext();
+
+		expect(ctx.helpers.returnJsonArray({ a: 1 })).toEqual([{ json: { a: 1 } }]);
+		expect(ctx.helpers.returnJsonArray([{ a: 1 }, { b: 2 }])).toEqual([
+			{ json: { a: 1 } },
+			{ json: { b: 2 } },
+		]);
+	});
 });
