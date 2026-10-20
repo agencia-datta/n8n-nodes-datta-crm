@@ -441,10 +441,11 @@ describe('Datta CRM node', () => {
 		);
 	});
 
-	it('registers the Lead and List resources, each with an operation property', () => {
+	it('registers every resource, each with an operation property', () => {
+		const resources = ['emailCampaign', 'form', 'lead', 'list', 'sale'];
 		const resource = description.properties.find((p) => p.name === 'resource');
-		expect(resource?.options?.map((o) => (o as { value: string }).value)).toEqual(['lead', 'list']);
-		for (const value of ['lead', 'list']) {
+		expect(resource?.options?.map((o) => (o as { value: string }).value)).toEqual(resources);
+		for (const value of resources) {
 			const operation = description.properties.find(
 				(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes(value),
 			);

@@ -1,5 +1,5 @@
 import { NodeOperationError, type IDataObject, type IExecuteFunctions } from 'n8n-workflow';
-import { dattaCrmRequest } from './transport';
+import { dattaCrmRequest, dattaCrmRequestAll } from './transport';
 
 /** Value of the "No Owner" choice of an owner selector; it is sent to the API as `null`. */
 export const NO_OWNER_VALUE = '__none__';
@@ -90,6 +90,103 @@ export function parseJsonParameter(
 			description: (error as Error).message,
 		});
 	}
+}
+
+/** Parses a JSON parameter that must be an object (arrays and `null` are rejected). */
+export function parseJsonObject(
+	context: IExecuteFunctions,
+	value: unknown,
+	fieldName: string,
+	itemIndex: number,
+): IDataObject {
+	const parsed = parseJsonParameter(context, value, fieldName, itemIndex) as unknown;
+	if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new NodeOperationError(context.getNode(), `"${fieldName}" must be a JSON object`, {
+			itemIndex,
+			description: 'Use a JSON object such as {"key": "value"}.',
+		});
+	}
+	return parsed as IDataObject;
+}
+
+/** Parses a JSON parameter that must be an array. */
+export function parseJsonArray(
+	context: IExecuteFunctions,
+	value: unknown,
+	fieldName: string,
+	itemIndex: number,
+): IDataObject[] {
+	const parsed = parseJsonParameter(context, value, fieldName, itemIndex) as unknown;
+	if (!Array.isArray(parsed)) {
+		throw new NodeOperationError(context.getNode(), `"${fieldName}" must be a JSON array`, {
+			itemIndex,
+			description: 'Use a JSON array such as [{"type": "email"}].',
+		});
+	}
+	return parsed as IDataObject[];
+}
+
+/** `/base/{id}` for the ID parameter `parameter`, which must not be blank. */
+export function idPath(
+	context: IExecuteFunctions,
+	itemIndex: number,
+	base: string,
+	parameter: string,
+	label: string,
+): string {
+	const id = requireText(
+		context,
+		context.getNodeParameter(parameter, itemIndex, ''),
+		label,
+		itemIndex,
+	);
+	return `${base}/${encodeURIComponent(id)}`;
+}
+
+/** Get Many: reads Return All / Limit and follows the cursors of a paginated list. */
+export async function fetchMany(
+	context: IExecuteFunctions,
+	itemIndex: number,
+	path: string,
+	qs: IDataObject,
+): Promise<IDataObject[]> {
+	const returnAll = context.getNodeParameter('returnAll', itemIndex, false) as boolean;
+	const max = returnAll ? undefined : (context.getNodeParameter('limit', itemIndex, 50) as number);
+	return dattaCrmRequestAll.call(context, path, qs, max);
+}
+
+/** Throws unless the request body has at least one key. */
+export function requireNonEmptyBody(
+	context: IExecuteFunctions,
+	body: IDataObject,
+	itemIndex: number,
+	groupLabel: string,
+): void {
+	if (Object.keys(body).length === 0) {
+		throw new NodeOperationError(context.getNode(), 'Choose at least one field to update', {
+			itemIndex,
+			description: `Add a field under "${groupLabel}".`,
+		});
+	}
+}
+
+/** Runs the handler of the selected operation, or throws for an unknown one. */
+export async function runOperation(
+	context: IExecuteFunctions,
+	itemIndex: number,
+	resourceLabel: string,
+	operations: Record<string, ResourceExecutor>,
+): Promise<IDataObject | IDataObject[]> {
+	const operation = context.getNodeParameter('operation', itemIndex) as string;
+	const handler = operations[operation];
+	if (handler === undefined) {
+		throw new NodeOperationError(
+			context.getNode(),
+			`Unknown ${resourceLabel} operation "${operation}"`,
+			{ itemIndex },
+		);
+	}
+	return handler.call(context, itemIndex);
 }
 
 export interface CustomFieldEntry {

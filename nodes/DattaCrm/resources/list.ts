@@ -82,7 +82,14 @@ export async function executeList(
 	}
 
 	if (operation === 'getAll') {
-		const lists = (await dattaCrmRequest.call(this, 'GET', '/lists')) as IDataObject[];
+		const data = await dattaCrmRequest.call(this, 'GET', '/lists');
+		if (!Array.isArray(data)) {
+			throw new NodeOperationError(this.getNode(), 'Unexpected response from the Datta CRM API', {
+				itemIndex,
+				description: 'Expected a list of lists. Check the base URL of the credential.',
+			});
+		}
+		const lists = data as IDataObject[];
 		if (this.getNodeParameter('returnAll', itemIndex, false) as boolean) return lists;
 		return lists.slice(0, this.getNodeParameter('limit', itemIndex, 50) as number);
 	}

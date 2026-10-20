@@ -213,7 +213,7 @@ export const leadFields: INodeProperties[] = [
 				typeOptions: { loadOptionsMethod: 'getPipelines' },
 				default: '',
 				description:
-					'Pipeline of the stage. Only used together with a stage. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					'Pipeline of the stage. Only sent when a stage is also chosen. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Source',
@@ -241,7 +241,7 @@ export const leadFields: INodeProperties[] = [
 				typeOptions: { loadOptionsMethod: 'getTags' },
 				default: [],
 				description:
-					'Tags to add to the lead. Choose from the list, or specify names using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					'Tags to add to the lead, identified by name. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'UTM',
@@ -388,7 +388,7 @@ export const leadFields: INodeProperties[] = [
 				typeOptions: { loadOptionsMethod: 'getTags' },
 				default: '',
 				description:
-					'Only leads with this tag. Choose from the list, or specify a name using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					'Only leads with this tag, identified by name. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Updated Since',
@@ -486,7 +486,7 @@ export const leadFields: INodeProperties[] = [
 		default: [],
 		displayOptions: { show: { ...LEAD, operation: ['addTags', 'removeTags'] } },
 		description:
-			'Choose from the list, or specify names using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. A comma-separated string also works. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			'Tags are identified by name. A comma-separated string also works. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
 		displayName: 'List Names or IDs',
@@ -497,7 +497,7 @@ export const leadFields: INodeProperties[] = [
 		default: [],
 		displayOptions: { show: { ...LEAD, operation: ['addToLists', 'removeFromLists'] } },
 		description:
-			'Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. A comma-separated string also works. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			'A comma-separated string also works. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 
 	// Move to Stage
@@ -557,13 +557,15 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		});
 	}
 	const fields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
+	const hasStage = typeof fields.stageId === 'string' && fields.stageId.trim() !== '';
 	const body = compact({
 		email,
 		phone,
 		name: fields.name,
 		tags: toStringArray(fields.tags),
 		listIds: toStringArray(fields.listIds),
-		pipelineId: fields.pipelineId,
+		// The API only accepts a pipeline together with a stage.
+		pipelineId: hasStage ? fields.pipelineId : undefined,
 		stageId: fields.stageId,
 		ownerId: fields.ownerId,
 		value: fields.value,

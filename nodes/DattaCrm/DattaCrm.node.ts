@@ -8,8 +8,11 @@ import {
 	type INodeTypeDescription,
 	type JsonObject,
 } from 'n8n-workflow';
+import { emailCampaignDescription, executeEmailCampaign } from './resources/emailCampaign';
+import { executeForm, formDescription } from './resources/form';
 import { executeLead, leadDescription } from './resources/lead';
 import { executeList, listDescription } from './resources/list';
+import { executeSale, saleDescription } from './resources/sale';
 import {
 	getAllStages,
 	getCustomFields,
@@ -28,6 +31,9 @@ import type { ResourceExecutor } from './shared/utils';
 const executors: Record<string, ResourceExecutor> = {
 	lead: executeLead,
 	list: executeList,
+	sale: executeSale,
+	form: executeForm,
+	emailCampaign: executeEmailCampaign,
 };
 
 export class DattaCrm implements INodeType {
@@ -53,13 +59,19 @@ export class DattaCrm implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{ name: 'Email Campaign', value: 'emailCampaign' },
+					{ name: 'Form', value: 'form' },
 					{ name: 'Lead', value: 'lead' },
 					{ name: 'List', value: 'list' },
+					{ name: 'Sale', value: 'sale' },
 				],
 				default: 'lead',
 			},
 			...leadDescription,
 			...listDescription,
+			...saleDescription,
+			...formDescription,
+			...emailCampaignDescription,
 		],
 	};
 
