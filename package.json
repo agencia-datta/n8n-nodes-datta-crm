@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-datta-crm",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "n8n nodes for Datta CRM: leads, sales, forms, email drafts and real-time triggers.",
 	"license": "MIT",
 	"homepage": "https://github.com/agencia-datta/n8n-nodes-datta-crm#readme",
@@ -29,7 +29,8 @@
 		"prepublishOnly": "n8n-node prerelease"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"!dist/tsconfig.tsbuildinfo"
 	],
 	"publishConfig": {
 		"access": "public",
