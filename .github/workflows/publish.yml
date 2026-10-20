@@ -45,12 +45,11 @@
 #
 # ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
 #
-# Run the following command locally to start an interactive release:
-#
-#   npm run release
-#
-# This will lint, build, prompt for a version bump, update the changelog,
-# commit, tag, and push — which triggers this workflow to publish to npm.
+# Maintainers start a release locally with `npm run release`. release-it prompts
+# for a version bump, updates the changelog, commits, tags and pushes; it does
+# not publish from the local machine. Pushing the tag triggers this workflow,
+# which installs with `npm ci --ignore-scripts`, runs `npm test`, and then runs
+# `npm run release` in CI: lint, build and `npm publish` with provenance.
 
 name: Publish
 
@@ -74,16 +73,19 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 'lts/*'
-          cache: 'npm'
+          # No npm cache here: this job publishes with provenance, so it never restores a cache
+          # that a pull request run could have written.
 
+      # Actions are pinned by commit SHA (version in the comment), not by a movable tag.
+      # --ignore-scripts keeps dependency install scripts away from the publish credentials.
       - name: Install dependencies
-        run: 'npm ci'
+        run: 'npm ci --ignore-scripts'
 
       - name: Run tests
         run: 'npm test'
