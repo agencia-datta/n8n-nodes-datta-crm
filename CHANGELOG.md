@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Published through npm trusted publishing (OIDC) from GitHub Actions, with provenance.
+- The package no longer ships the TypeScript build cache (`dist/tsconfig.tsbuildinfo`).
+- No changes to the nodes or the credential.
+
 ## 0.1.0
 
 First release.
