@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+Follows the new organisation of leads in Datta CRM: origin → folder → list, with no default list.
+
+- **List → Create** has **Folder** and **Origin**. Without a folder, the CRM uses the only folder of the origin (Site by default) and returns `folder_required` when the origin has no folder or several. Workflows saved with 0.1.x keep sending only the name, with the Site origin.
+- New **Folder → Get Many** resource (`GET /folders`).
+- **Lead → Create or Update**: **List Names or IDs** moved out of Additional Fields and is shown next to email and phone, with the rule that a new lead needs a list unless the API key has one (`list_required`). Lists saved in Additional Fields by 0.1.x workflows are still sent. **Source** is marked as ignored by the CRM.
+- List dropdowns show "folder / list". Folder dropdowns show "origin / folder".
+
 ## 0.1.1
 
 - Published through npm trusted publishing (OIDC) from GitHub Actions, with provenance.

@@ -68,9 +68,25 @@ export async function getTags(this: ILoadOptionsFunctions): Promise<INodePropert
 	return tags.map((tag) => ({ name: tag.name, value: tag.name }));
 }
 
+/** Lists named "folder / list", since list names only have to be unique within an origin. */
 export async function getLists(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-	const lists = await fetchList<{ id: string; name: string }>(this, '/lists');
-	return lists.map((list) => ({ name: list.name, value: list.id }));
+	const lists = await fetchList<{ id: string; name: string; folderName: string }>(this, '/lists');
+	return lists.map((list) => ({ name: `${list.folderName} / ${list.name}`, value: list.id }));
+}
+
+const ORIGIN_LABELS: Record<string, string> = {
+	site: 'Site',
+	whatsapp: 'WhatsApp',
+	instagram: 'Instagram',
+};
+
+/** Folders named "origin / folder": folder names can repeat across origins. */
+export async function getFolders(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+	const folders = await fetchList<{ id: string; name: string; origin: string }>(this, '/folders');
+	return folders.map((folder) => ({
+		name: `${ORIGIN_LABELS[folder.origin] ?? folder.origin} / ${folder.name}`,
+		value: folder.id,
+	}));
 }
 
 export async function getMembers(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {

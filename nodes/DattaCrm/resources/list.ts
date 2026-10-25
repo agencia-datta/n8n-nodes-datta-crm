@@ -5,7 +5,7 @@ import {
 	type INodeProperties,
 } from 'n8n-workflow';
 import { dattaCrmRequest } from '../shared/transport';
-import { requireText } from '../shared/utils';
+import { compact, getAllUnpaginated, requireText } from '../shared/utils';
 
 const LIST = { resource: ['list'] };
 
@@ -42,7 +42,32 @@ export const listFields: INodeProperties[] = [
 		required: true,
 		default: '',
 		displayOptions: { show: { ...LIST, operation: ['create'] } },
-		description: 'Name of the list (up to 80 characters)',
+		description:
+			'Name of the list (up to 80 characters). It must be unique among the lists of the same origin.',
+	},
+	{
+		displayName: 'Folder Name or ID',
+		name: 'folderId',
+		type: 'options',
+		typeOptions: { loadOptionsMethod: 'getFolders' },
+		default: '',
+		displayOptions: { show: { ...LIST, operation: ['create'] } },
+		description:
+			'Folder of the new list; the list takes the origin of the folder. Can be left empty only when the origin below has exactly one folder, otherwise the CRM returns "folder_required". Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+	},
+	{
+		displayName: 'Origin',
+		name: 'origin',
+		type: 'options',
+		options: [
+			{ name: 'Instagram', value: 'instagram' },
+			{ name: 'Site', value: 'site' },
+			{ name: 'WhatsApp', value: 'whatsapp' },
+		],
+		default: 'site',
+		displayOptions: { show: { ...LIST, operation: ['create'] } },
+		description:
+			'Origin whose only folder receives the list when no folder is chosen. Ignored when a folder is chosen.',
 	},
 	{
 		displayName: 'Return All',
@@ -78,20 +103,15 @@ export async function executeList(
 			'List name',
 			itemIndex,
 		);
-		return dattaCrmRequest.call(this, 'POST', '/lists', { name });
+		const folderId = String(this.getNodeParameter('folderId', itemIndex, '')).trim();
+		// The API ignores the origin when a folder is given: send it only to pick the folder.
+		const origin =
+			folderId === '' ? (this.getNodeParameter('origin', itemIndex, 'site') as string) : undefined;
+		return dattaCrmRequest.call(this, 'POST', '/lists', compact({ name, folderId, origin }));
 	}
 
 	if (operation === 'getAll') {
-		const data = await dattaCrmRequest.call(this, 'GET', '/lists');
-		if (!Array.isArray(data)) {
-			throw new NodeOperationError(this.getNode(), 'Unexpected response from the Datta CRM API', {
-				itemIndex,
-				description: 'Expected a list of lists. Check the base URL of the credential.',
-			});
-		}
-		const lists = data as IDataObject[];
-		if (this.getNodeParameter('returnAll', itemIndex, false) as boolean) return lists;
-		return lists.slice(0, this.getNodeParameter('limit', itemIndex, 50) as number);
+		return getAllUnpaginated(this, '/lists', 'lists', itemIndex);
 	}
 
 	throw new NodeOperationError(this.getNode(), `Unknown list operation "${operation}"`, {

@@ -10,6 +10,7 @@ import {
 	type JsonObject,
 } from 'n8n-workflow';
 import { emailCampaignDescription, executeEmailCampaign } from './resources/emailCampaign';
+import { executeFolder, folderDescription } from './resources/folder';
 import { executeForm, formDescription } from './resources/form';
 import { executeLead, leadDescription } from './resources/lead';
 import { executeList, listDescription } from './resources/list';
@@ -18,6 +19,7 @@ import {
 	getAllStages,
 	getCustomFields,
 	getEvents,
+	getFolders,
 	getForms,
 	getLists,
 	getMembers,
@@ -32,6 +34,7 @@ import type { ResourceExecutor } from './shared/utils';
 const executors: Record<string, ResourceExecutor> = {
 	lead: executeLead,
 	list: executeList,
+	folder: executeFolder,
 	sale: executeSale,
 	form: executeForm,
 	emailCampaign: executeEmailCampaign,
@@ -61,6 +64,7 @@ export class DattaCrm implements INodeType {
 				noDataExpression: true,
 				options: [
 					{ name: 'Email Campaign', value: 'emailCampaign' },
+					{ name: 'Folder', value: 'folder' },
 					{ name: 'Form', value: 'form' },
 					{ name: 'Lead', value: 'lead' },
 					{ name: 'List', value: 'list' },
@@ -70,6 +74,7 @@ export class DattaCrm implements INodeType {
 			},
 			...leadDescription,
 			...listDescription,
+			...folderDescription,
 			...saleDescription,
 			...formDescription,
 			...emailCampaignDescription,
@@ -81,6 +86,7 @@ export class DattaCrm implements INodeType {
 			getAllStages,
 			getCustomFields,
 			getEvents,
+			getFolders,
 			getForms,
 			getLists,
 			getMembers,

@@ -160,6 +160,16 @@ export const leadFields: INodeProperties[] = [
 			'Phone of the lead, ideally with country code. Provide an email, a phone, or both.',
 	},
 	{
+		displayName: 'List Names or IDs',
+		name: 'listIds',
+		type: 'multiOptions',
+		typeOptions: { loadOptionsMethod: 'getLists' },
+		default: [],
+		displayOptions: { show: { ...LEAD, operation: ['upsert'] } },
+		description:
+			'Lists to add the lead to; a new lead takes the origin of the first one. A new lead needs a list: leave it empty only if the API key has a list set in Datta CRM, otherwise the CRM returns "list_required". An existing lead is accepted without a list. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+	},
+	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
 		type: 'collection',
@@ -168,15 +178,6 @@ export const leadFields: INodeProperties[] = [
 		displayOptions: { show: { ...LEAD, operation: ['upsert'] } },
 		options: [
 			customFieldsProperty,
-			{
-				displayName: 'List Names or IDs',
-				name: 'listIds',
-				type: 'multiOptions',
-				typeOptions: { loadOptionsMethod: 'getLists' },
-				default: [],
-				description:
-					'Lists to add the lead to. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
-			},
 			{
 				displayName: 'Mode',
 				name: 'mode',
@@ -220,7 +221,8 @@ export const leadFields: INodeProperties[] = [
 				name: 'source',
 				type: 'string',
 				default: '',
-				description: 'Where the lead came from',
+				description:
+					'Deprecated: the CRM ignores it. The origin of a new lead is the origin of its first list.',
 			},
 			{
 				displayName: 'Stage Name or ID',
@@ -563,7 +565,13 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		phone,
 		name: fields.name,
 		tags: toStringArray(fields.tags),
-		listIds: toStringArray(fields.listIds),
+		// Up to 0.1.x the lists were an additional field: workflows saved then still carry them there.
+		listIds: [
+			...new Set([
+				...toStringArray(this.getNodeParameter('listIds', i, [])),
+				...toStringArray(fields.listIds),
+			]),
+		],
 		// The API only accepts a pipeline together with a stage.
 		pipelineId: hasStage ? fields.pipelineId : undefined,
 		stageId: fields.stageId,
