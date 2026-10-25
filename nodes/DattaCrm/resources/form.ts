@@ -162,15 +162,6 @@ export const formFields: INodeProperties[] = [
 					'JSON object with the email marketing opt-in, for example {"enabled": true, "text": "Send me news"}',
 			},
 			{
-				displayName: 'Funnel Stage Name or ID',
-				name: 'funnelStageId',
-				type: 'options',
-				typeOptions: { loadOptionsMethod: 'getAllStages' },
-				default: '',
-				description:
-					'Stage where the leads of the form enter the funnel. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
-			},
-			{
 				displayName: 'Is Active',
 				name: 'isActive',
 				type: 'boolean',
@@ -288,7 +279,6 @@ async function createForm(this: IExecuteFunctions, i: number): Promise<IDataObje
 	const slug = requireText(this, this.getNodeParameter('slug', i, ''), 'Slug', i);
 	const fields = parseJsonArray(this, this.getNodeParameter('fields', i, '[]'), 'Fields', i);
 	const extra = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-	const stageId = extra.funnelStageId;
 	const body = {
 		name,
 		slug,
@@ -298,8 +288,6 @@ async function createForm(this: IExecuteFunctions, i: number): Promise<IDataObje
 		...compact({
 			defaultTags: toStringArray(extra.defaultTags),
 			defaultListId: extra.defaultListId,
-			funnelEntry:
-				typeof stageId === 'string' && stageId !== '' ? { enabled: true, stageId } : undefined,
 			isActive: extra.isActive,
 			showQuestions: extra.showQuestions,
 			theme: optionalObject(this, extra, 'theme', 'Theme', i),

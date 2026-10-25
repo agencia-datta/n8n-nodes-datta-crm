@@ -6,85 +6,81 @@ import {
 	getFolders,
 	getForms,
 	getLists,
+	getLossReasons,
 	getMembers,
 	getMembersWithNoOwner,
-	getPipelines,
 	getStages,
 	getTags,
 } from '../nodes/DattaCrm/shared/loadOptions';
 import { createLoadOptionsContext, ok, page, type Params } from './helpers';
 
-const pipelines = [
+const lists = [
 	{
-		id: 'p1',
-		name: 'Sales',
-		color: null,
+		id: 'l1',
+		name: 'Leads',
+		isDefault: false,
+		folderId: 'f1',
+		folderName: 'WhatsApp',
+		count: 2,
+		hasFunnel: true,
 		stages: [
-			{ id: 's1', name: 'New', kind: 'open', position: 0, probability: 10 },
-			{ id: 's2', name: 'Won', kind: 'won', position: 1, probability: 100 },
+			{ id: 's1', name: 'New', kind: 'active', position: 0 },
+			{ id: 's2', name: 'Won', kind: 'won', position: 1 },
 		],
 	},
 	{
-		id: 'p2',
-		name: 'Support',
-		color: '#fff',
-		stages: [{ id: 's3', name: 'Triage', kind: 'open', position: 0, probability: 0 }],
+		id: 'l2',
+		name: 'Newsletter',
+		isDefault: false,
+		folderId: 'f2',
+		folderName: 'Site',
+		count: 1,
+		hasFunnel: false,
+		stages: [],
+	},
+	{
+		id: 'l3',
+		name: 'Ads',
+		isDefault: false,
+		folderId: 'f3',
+		folderName: 'Instagram',
+		count: 0,
+		hasFunnel: true,
+		stages: [{ id: 's3', name: 'Triage', kind: 'active', position: 0 }],
 	},
 ];
 
 function stagesContext(currentParams: Params) {
-	return createLoadOptionsContext({ currentParams, responses: [ok(pipelines)] });
+	return createLoadOptionsContext({ currentParams, responses: [ok(lists)] });
 }
 
 describe('loadOptions', () => {
-	it('getPipelines maps name and id from GET /pipelines', async () => {
-		const { ctx, request } = createLoadOptionsContext({ responses: [ok(pipelines)] });
-
-		expect(await getPipelines.call(ctx)).toEqual([
-			{ name: 'Sales', value: 'p1' },
-			{ name: 'Support', value: 'p2' },
-		]);
-		expect(request.mock.calls[0][1]).toMatchObject({
-			method: 'GET',
-			url: 'https://crm.example.com/api/v1/pipelines',
-		});
-	});
-
-	it('getStages with a pipeline returns only that pipeline stages', async () => {
-		const { ctx } = stagesContext({ pipelineId: 'p1' });
+	it('getStages with a list returns only that list stages, from GET /lists', async () => {
+		const { ctx, request } = stagesContext({ listId: 'l1' });
 
 		expect(await getStages.call(ctx)).toEqual([
 			{ name: 'New', value: 's1' },
 			{ name: 'Won', value: 's2' },
 		]);
-	});
-
-	it.each([
-		['additionalFields.pipelineId', { additionalFields: { pipelineId: 'p2' } }],
-		['filters.pipelineId', { filters: { pipelineId: 'p2' } }],
-		['updateFields.pipelineId', { updateFields: { pipelineId: 'p2' } }],
-	])('getStages falls back to %s', async (_name, currentParams) => {
-		const { ctx } = stagesContext(currentParams);
-
-		expect(await getStages.call(ctx)).toEqual([{ name: 'Triage', value: 's3' }]);
-	});
-
-	it('getStages prefers the top-level pipelineId', async () => {
-		const { ctx } = stagesContext({
-			pipelineId: 'p1',
-			additionalFields: { pipelineId: 'p2' },
+		expect(request.mock.calls[0][1]).toMatchObject({
+			method: 'GET',
+			url: 'https://crm.example.com/api/v1/lists',
 		});
-
-		expect((await getStages.call(ctx)).map((o) => o.value)).toEqual(['s1', 's2']);
 	});
 
-	it('getStages without a pipeline returns every stage as "pipeline / stage"', async () => {
+	it('getStages with a Site list returns nothing', async () => {
+		const { ctx } = stagesContext({ listId: 'l2' });
+
+		expect(await getStages.call(ctx)).toEqual([]);
+	});
+
+	it('getStages without a list returns every stage as "folder / list / stage"', async () => {
 		const { ctx } = stagesContext({});
 
 		expect(await getStages.call(ctx)).toEqual([
-			{ name: 'Sales / New', value: 's1' },
-			{ name: 'Sales / Won', value: 's2' },
-			{ name: 'Support / Triage', value: 's3' },
+			{ name: 'WhatsApp / Leads / New', value: 's1' },
+			{ name: 'WhatsApp / Leads / Won', value: 's2' },
+			{ name: 'Instagram / Ads / Triage', value: 's3' },
 		]);
 	});
 
@@ -97,14 +93,25 @@ describe('loadOptions', () => {
 		expect(await getStages.call(ctx)).toHaveLength(3);
 	});
 
-	it('getAllStages returns every stage as "pipeline / stage"', async () => {
-		const { ctx } = stagesContext({ pipelineId: 'p1' });
+	it('getAllStages returns every stage as "folder / list / stage"', async () => {
+		const { ctx } = stagesContext({ listId: 'l1' });
 
-		expect(await getAllStages.call(ctx)).toEqual([
-			{ name: 'Sales / New', value: 's1' },
-			{ name: 'Sales / Won', value: 's2' },
-			{ name: 'Support / Triage', value: 's3' },
+		expect((await getAllStages.call(ctx)).map((o) => o.name)).toEqual([
+			'WhatsApp / Leads / New',
+			'WhatsApp / Leads / Won',
+			'Instagram / Ads / Triage',
 		]);
+	});
+
+	it('getLossReasons maps name and id from GET /loss-reasons', async () => {
+		const { ctx, request } = createLoadOptionsContext({
+			responses: [ok([{ id: 'r1', name: 'Price' }])],
+		});
+
+		expect(await getLossReasons.call(ctx)).toEqual([{ name: 'Price', value: 'r1' }]);
+		expect(request.mock.calls[0][1]).toMatchObject({
+			url: 'https://crm.example.com/api/v1/loss-reasons',
+		});
 	});
 
 	it('getTags uses the tag name as the value', async () => {

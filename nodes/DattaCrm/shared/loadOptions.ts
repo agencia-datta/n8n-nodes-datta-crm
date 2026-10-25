@@ -2,65 +2,57 @@ import type { ILoadOptionsFunctions, INodePropertyOptions } from 'n8n-workflow';
 import { dattaCrmRequest, dattaCrmRequestAll } from './transport';
 import { NO_OWNER_VALUE } from './utils';
 
-interface Pipeline {
+interface ListWithStages {
 	id: string;
 	name: string;
-	stages: Array<{ id: string; name: string }>;
+	folderName: string;
+	stages?: Array<{ id: string; name: string }>;
 }
-
-/** Where the pipeline of a stage selector can live, in order of preference. */
-const PIPELINE_PARAMETER_PATHS = [
-	'pipelineId',
-	'additionalFields.pipelineId',
-	'filters.pipelineId',
-	'updateFields.pipelineId',
-];
 
 async function fetchList<T>(context: ILoadOptionsFunctions, path: string): Promise<T[]> {
 	const data = (await dattaCrmRequest.call(context, 'GET', path)) as unknown;
 	return Array.isArray(data) ? (data as T[]) : [];
 }
 
-function readCurrentPipelineId(context: ILoadOptionsFunctions): string | undefined {
-	for (const path of PIPELINE_PARAMETER_PATHS) {
-		try {
-			const value = context.getCurrentNodeParameter(path);
-			if (typeof value === 'string' && value !== '') return value;
-		} catch {
-			// The parameter does not exist in this context: try the next location.
-		}
+function readCurrentListId(context: ILoadOptionsFunctions): string | undefined {
+	try {
+		const value = context.getCurrentNodeParameter('listId');
+		if (typeof value === 'string' && value !== '') return value;
+	} catch {
+		// The parameter does not exist in this context.
 	}
 	return undefined;
 }
 
-function allStages(pipelines: Pipeline[]): INodePropertyOptions[] {
-	return pipelines.flatMap((pipeline) =>
-		pipeline.stages.map((stage) => ({
-			name: `${pipeline.name} / ${stage.name}`,
+/** Every stage of the lists with a funnel, named "folder / list / stage". */
+function allStages(lists: ListWithStages[]): INodePropertyOptions[] {
+	return lists.flatMap((list) =>
+		(list.stages ?? []).map((stage) => ({
+			name: `${list.folderName} / ${list.name} / ${stage.name}`,
 			value: stage.id,
 		})),
 	);
 }
 
-export async function getPipelines(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-	const pipelines = await fetchList<Pipeline>(this, '/pipelines');
-	return pipelines.map((pipeline) => ({ name: pipeline.name, value: pipeline.id }));
-}
-
 /**
- * Stages of the pipeline chosen next to the field (top level or inside a collection). Without a
- * pipeline, every stage is listed as "pipeline / stage".
+ * Stages of the list chosen next to the field. Without a list, every stage is listed as
+ * "folder / list / stage". Lists of the Site origin have no stages.
  */
 export async function getStages(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-	const pipelines = await fetchList<Pipeline>(this, '/pipelines');
-	const pipelineId = readCurrentPipelineId(this);
-	if (pipelineId === undefined) return allStages(pipelines);
-	const pipeline = pipelines.find((candidate) => candidate.id === pipelineId);
-	return (pipeline?.stages ?? []).map((stage) => ({ name: stage.name, value: stage.id }));
+	const lists = await fetchList<ListWithStages>(this, '/lists');
+	const listId = readCurrentListId(this);
+	if (listId === undefined) return allStages(lists);
+	const list = lists.find((candidate) => candidate.id === listId);
+	return (list?.stages ?? []).map((stage) => ({ name: stage.name, value: stage.id }));
 }
 
 export async function getAllStages(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-	return allStages(await fetchList<Pipeline>(this, '/pipelines'));
+	return allStages(await fetchList<ListWithStages>(this, '/lists'));
+}
+
+export async function getLossReasons(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+	const reasons = await fetchList<{ id: string; name: string }>(this, '/loss-reasons');
+	return reasons.map((reason) => ({ name: reason.name, value: reason.id }));
 }
 
 export async function getTags(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {

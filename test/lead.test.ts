@@ -63,7 +63,7 @@ describe('Lead: Create or Update', () => {
 		expect(calls[0].body).toEqual({ email: 'ana@example.com' });
 	});
 
-	it('sends every additional field with the contract key names', async () => {
+	it('sends every additional field with the contract key names, without stage or value', async () => {
 		const { calls } = await run(
 			{
 				resource: 'lead',
@@ -91,10 +91,7 @@ describe('Lead: Create or Update', () => {
 			name: 'Ana',
 			tags: ['a', 'b'],
 			listIds: ['l1'],
-			pipelineId: 'p1',
-			stageId: 's1',
 			ownerId: 'm1',
-			value: 0,
 			source: 'n8n',
 			utm: { source: 'g', campaign: 'c' },
 			mode: 'createOnly',
@@ -322,7 +319,6 @@ describe('Lead: Get Many', () => {
 			phone: '+55',
 			tag: 'vip',
 			listId: 'l1',
-			pipelineId: 'p1',
 			stageId: 's1',
 			updatedSince: '2026-10-20T13:00:00.000Z',
 			limit: 5,
@@ -363,7 +359,7 @@ describe('Lead: Update', () => {
 		});
 	});
 
-	it('sends the filled fields, keeps value 0 and types custom fields', async () => {
+	it('sends the filled fields and types custom fields, without value or loss reason', async () => {
 		const { calls } = await run(
 			{
 				resource: 'lead',
@@ -380,12 +376,7 @@ describe('Lead: Update', () => {
 			[ok([PLAN_FIELD]), ok({ lead: lead() })],
 		);
 
-		expect(calls[1].body).toEqual({
-			name: 'Ana B',
-			value: 0,
-			lossReason: 'price',
-			customFields: { plano: 'ouro' },
-		});
+		expect(calls[1].body).toEqual({ name: 'Ana B', customFields: { plano: 'ouro' } });
 	});
 
 	it('throws when no field was chosen', async () => {
@@ -395,7 +386,7 @@ describe('Lead: Update', () => {
 	});
 });
 
-describe('Lead: tags, lists and stage', () => {
+describe('Lead: tags and lists', () => {
 	it('Add Tags patches addTags from a comma separated string', async () => {
 		const { calls } = await run(
 			{ resource: 'lead', operation: 'addTags', leadId: LEAD_ID, tags: 'a, b' },
@@ -443,25 +434,98 @@ describe('Lead: tags, lists and stage', () => {
 			run({ resource: 'lead', operation: 'addToLists', leadId: LEAD_ID, listIds: '' }, []),
 		).rejects.toThrow('Choose at least one list');
 	});
+});
 
-	it('Move to Stage sends exactly { stageId }', async () => {
-		const { calls } = await run(
+describe('Lead: Update in List', () => {
+	const membership = {
+		listId: 'l1',
+		listName: 'Leads',
+		folderId: 'f1',
+		folderName: 'WhatsApp',
+		origin: 'whatsapp',
+		stageId: 's3',
+		stageName: 'Perdido',
+		stageKind: 'lost',
+		stageEnteredAt: '2026-10-25T10:00:00.000Z',
+		value: 0,
+		lossReasonId: 'r1',
+	};
+
+	it('patches the lead in the list with stage, value 0 and loss reason', async () => {
+		const { items, calls } = await run(
 			{
 				resource: 'lead',
-				operation: 'moveToStage',
+				operation: 'updateInList',
 				leadId: LEAD_ID,
-				pipelineId: 'p1',
-				stageId: 's2',
+				listId: 'l1',
+				listFields: { stageId: 's3', value: 0, lossReasonId: 'r1' },
 			},
-			[ok({ lead: lead() })],
+			[ok(membership)],
 		);
 
 		expect(calls[0]).toMatchObject({
 			method: 'PATCH',
-			url: `${BASE}/leads/${LEAD_ID}`,
-			body: { stageId: 's2' },
+			url: `${BASE}/leads/${LEAD_ID}/lists/l1`,
 		});
+		expect(calls[0].body).toEqual({ stageId: 's3', value: 0, lossReasonId: 'r1' });
+		expect(items.map((i) => i.json)).toEqual([membership]);
+	});
+
+	it('sends only the chosen field', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'updateInList',
+				leadId: LEAD_ID,
+				listId: 'l1',
+				listFields: { stageId: 's2', lossReasonId: '' },
+			},
+			[ok(membership)],
+		);
+
 		expect(calls[0].body).toEqual({ stageId: 's2' });
+	});
+
+	it('throws when no field was chosen', async () => {
+		await expect(
+			run(
+				{
+					resource: 'lead',
+					operation: 'updateInList',
+					leadId: LEAD_ID,
+					listId: 'l1',
+					listFields: {},
+				},
+				[],
+			),
+		).rejects.toThrow('Choose at least one field to update');
+	});
+
+	it('throws when the list is empty', async () => {
+		await expect(
+			run(
+				{
+					resource: 'lead',
+					operation: 'updateInList',
+					leadId: LEAD_ID,
+					listId: ' ',
+					listFields: { value: 10 },
+				},
+				[],
+			),
+		).rejects.toThrow('List is required');
+	});
+
+	it('points a 0.2.x Move to Stage workflow to Update in List', async () => {
+		const { ctx } = createExecuteContext({
+			params: { resource: 'lead', operation: 'moveToStage', leadId: LEAD_ID, stageId: 's2' },
+		});
+		const error = await new DattaCrm().execute.call(ctx).catch((e: unknown) => e);
+
+		expect(error).toMatchObject({
+			message: 'Unknown lead operation "moveToStage"',
+			description: 'Stages now belong to each list: use the "Update in List" operation.',
+		});
 	});
 });
 
@@ -475,7 +539,7 @@ describe('Datta CRM node', () => {
 	});
 
 	it('registers every resource, each with an operation property', () => {
-		const resources = ['emailCampaign', 'folder', 'form', 'lead', 'list', 'sale'];
+		const resources = ['emailCampaign', 'folder', 'form', 'lead', 'list', 'lossReason', 'sale'];
 		const resource = description.properties.find((p) => p.name === 'resource');
 		expect(resource?.options?.map((o) => (o as { value: string }).value)).toEqual(resources);
 		for (const value of resources) {

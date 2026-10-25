@@ -213,7 +213,8 @@ describe('create', () => {
 		const { ctx, staticData, request } = hook({
 			params: {
 				events: ['sale.paid', 'deal.won'],
-				filters: { productId: 'p1, p2', pipelineId: ['pipe-1'] },
+				// pipelineId is a filter saved by 0.2.x: the CRM no longer accepts it.
+				filters: { productId: 'p1, p2', listId: ['list-1'], pipelineId: ['pipe-1'] },
 			},
 			workflow: { id: 'wf-1', name: 'My workflow', active: true },
 			responses: [ok([]), created('wh-9', 'whsec_abc')],
@@ -226,12 +227,16 @@ describe('create', () => {
 				targetUrl: WEBHOOK_URL,
 				events: ['sale.paid', 'deal.won'],
 				filters: {
-					'sale.paid': { productId: ['p1', 'p2'], pipelineId: ['pipe-1'] },
-					'deal.won': { productId: ['p1', 'p2'], pipelineId: ['pipe-1'] },
+					'sale.paid': { productId: ['p1', 'p2'], listId: ['list-1'] },
+					'deal.won': { productId: ['p1', 'p2'], listId: ['list-1'] },
 				},
 				ignoreOwnChanges: true,
 				name: 'n8n · My workflow',
 			},
+		});
+		expect((requestOptions(request, 1).body as { filters: unknown }).filters).toEqual({
+			'sale.paid': { listId: ['list-1'], productId: ['p1', 'p2'] },
+			'deal.won': { listId: ['list-1'], productId: ['p1', 'p2'] },
 		});
 		expect(staticData).toEqual(seeded('wh-9', 'whsec_abc'));
 	});

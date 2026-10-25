@@ -365,6 +365,7 @@ export async function getAllUnpaginated(
 	path: string,
 	what: string,
 	itemIndex: number,
+	returnAll?: boolean,
 ): Promise<IDataObject[]> {
 	const data = await dattaCrmRequest.call(context, 'GET', path);
 	if (!Array.isArray(data)) {
@@ -374,6 +375,7 @@ export async function getAllUnpaginated(
 		});
 	}
 	const rows = data as IDataObject[];
-	if (context.getNodeParameter('returnAll', itemIndex, false) as boolean) return rows;
+	if (returnAll ?? (context.getNodeParameter('returnAll', itemIndex, false) as boolean))
+		return rows;
 	return rows.slice(0, context.getNodeParameter('limit', itemIndex, 50) as number);
 }

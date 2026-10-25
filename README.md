@@ -38,23 +38,26 @@ The credential test calls `GET /api/v1/me`.
 
 ## Datta CRM node
 
-| Resource       | Operations                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| Lead           | Create or Update, Get, Get Many, Update, Move to Stage, Add Tags, Remove Tags, Add to Lists, Remove From Lists |
-| List           | Create, Get Many                                                                                               |
-| Folder         | Get Many                                                                                                       |
-| Sale           | Create or Update, Get, Get Many, Update                                                                        |
-| Form           | Create, Get, Get Many, Update, Activate, Deactivate                                                            |
-| Email Campaign | Create Draft, Get, Get Many, Update Draft                                                                      |
+| Resource       | Operations                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| Lead           | Create or Update, Get, Get Many, Update, Update in List, Add Tags, Remove Tags, Add to Lists, Remove From Lists |
+| List           | Create, Get Many, Get Stages                                                                                    |
+| Folder         | Get Many                                                                                                        |
+| Loss Reason    | Get Many                                                                                                        |
+| Sale           | Create or Update, Get, Get Many, Update                                                                         |
+| Form           | Create, Get, Get Many, Update, Activate, Deactivate                                                             |
+| Email Campaign | Create Draft, Get, Get Many, Update Draft                                                                       |
 
-Pipelines, stages, tags, lists (shown as "folder / list"), list folders (shown as "origin / folder"), forms, members, custom fields and webhook events are loaded from your account, so you pick them from dropdowns. You can also pass IDs with an expression.
+Stages (shown as "folder / list / stage", or only the stages of the chosen list), loss reasons, tags, lists (shown as "folder / list"), list folders (shown as "origin / folder"), forms, members, custom fields and webhook events are loaded from your account, so you pick them from dropdowns. You can also pass IDs with an expression.
 
 ### Behaviour notes
 
 - **Leads are organised as origin → folder → list.** Every list lives in a folder, and the folder sets the origin of its lists (Site, WhatsApp or Instagram). There is no default list.
+- **Funnel per list.** Lists of WhatsApp and Instagram have a funnel: their own stages (active, won or lost). Lists of Site have none. A lead has a stage, a value and a loss reason in each list with a funnel. List (Get Many) returns `hasFunnel` and `stages`; List (Get Stages) returns the stages of one list.
+- **Update in List (Lead)** changes the stage, the value or the loss reason of a lead in one of its lists, and runs the same automations and webhooks as the board. Moving to a lost stage needs a loss reason (`loss_reason_required`). A stage of another list returns `stage_not_in_list`, a list without a funnel returns `list_has_no_funnel`, and a lead outside the list returns `not_found`.
 - **Create (List)** takes a folder. The folder can be left empty only when the chosen origin (Site by default) has exactly one folder; with no folder or several, the CRM returns `folder_required`. Folder (Get Many) returns the folders of every origin.
-- **Create or Update (Lead)** matches by phone, then email, and needs at least one of them. If the lead already exists, only its empty fields are filled, and tags and lists are merged. A stage is only applied when the lead is outside the pipeline or in a won/lost stage; an active stage is kept (use Move to Stage). The Create Only mode returns an existing lead untouched. The result contains the lead and whether it was created or matched. A new lead needs a list: choose one in **List Names or IDs**, or leave it empty only if the API key has a list set in Datta CRM, otherwise the CRM returns `list_required`. The lead takes the origin of its first list; **Source** is ignored by the CRM. An existing lead is accepted without a list.
-- **Update (Lead)** overwrites the fields you set. You must set at least one. Add Tags, Remove Tags, Add to Lists, Remove From Lists and Move to Stage change only that part of the lead. Tags are identified by name.
+- **Create or Update (Lead)** matches by phone, then email, and needs at least one of them. If the lead already exists, only its empty fields are filled, and tags and lists are merged. Stage and value are not set here: use Update in List. The Create Only mode returns an existing lead untouched. The result contains the lead and whether it was created or matched. A new lead needs a list: choose one in **List Names or IDs**, or leave it empty only if the API key has a list set in Datta CRM, otherwise the CRM returns `list_required`. The lead takes the origin of its first list; **Source** is ignored by the CRM. An existing lead is accepted without a list.
+- **Update (Lead)** overwrites the fields you set. You must set at least one. Add Tags, Remove Tags, Add to Lists and Remove From Lists change only that part of the lead. Tags are identified by name.
 - **Custom fields** are chosen by key. Values are converted to the type the CRM defines for each field: number, yes/no (`true`/`false`, `1`/`0`, `yes`/`no`), multiple choice (comma-separated values) or text. An invalid number or yes/no value fails the item with a clear message.
 - **Get (Lead)** can search by lead ID, email or phone. When searching by email or phone it returns the first match, or no item when nothing matches.
 - **Get Many** has Return All and Limit. With Return All the node follows the API cursor until there are no more results. Lists and Folders (Get Many) are not paginated by the API.
@@ -68,7 +71,7 @@ Pipelines, stages, tags, lists (shown as "folder / list"), list folders (shown a
 The trigger registers a webhook in your CRM account when the workflow is activated (or when you listen for a test event) and removes it when the workflow is deactivated.
 
 - **Events**: pick one or more events. The list comes from your account.
-- **Filters** (optional): pipeline, stage, from stage, to stage, tag, form, product, origin and channel. A filter only applies to the events that support it; for example Product only affects sale events.
+- **Filters** (optional): list, stage, from stage, to stage, tag, form, product, origin and channel. A filter only applies to the events that support it; for example Product only affects sale events.
 - **Ignore Changes Made by This API Key** (on by default): skips events caused by the credential used by the trigger. Keep it on if the workflow writes back to Datta CRM with the same credential, to avoid loops.
 - **HTTPS on port 443**: Datta CRM only delivers to `https://` URLs on port 443. It also refuses private and loopback addresses. A local n8n needs a public HTTPS URL, for example through a tunnel.
 - **Signature**: every delivery is signed with `x-crm-signature` (HMAC-SHA256 of the raw body). The node verifies it automatically and answers `401` to deliveries with an invalid signature, which do not start the workflow.

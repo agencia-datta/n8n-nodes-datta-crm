@@ -29,6 +29,12 @@ export const listOperations: INodeProperties[] = [
 				description: 'Get many lists',
 				action: 'Get many lists',
 			},
+			{
+				name: 'Get Stages',
+				value: 'getStages',
+				description: 'Get the funnel stages of a list',
+				action: 'Get the stages of a list',
+			},
 		],
 		default: 'create',
 	},
@@ -68,6 +74,17 @@ export const listFields: INodeProperties[] = [
 		displayOptions: { show: { ...LIST, operation: ['create'] } },
 		description:
 			'Origin whose only folder receives the list when no folder is chosen. Ignored when a folder is chosen.',
+	},
+	{
+		displayName: 'List Name or ID',
+		name: 'listId',
+		type: 'options',
+		typeOptions: { loadOptionsMethod: 'getLists' },
+		required: true,
+		default: '',
+		displayOptions: { show: { ...LIST, operation: ['getStages'] } },
+		description:
+			'List whose stages are returned, in board order. Lists of the Site origin have no funnel and return no items. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
 		displayName: 'Return All',
@@ -112,6 +129,25 @@ export async function executeList(
 
 	if (operation === 'getAll') {
 		return getAllUnpaginated(this, '/lists', 'lists', itemIndex);
+	}
+
+	if (operation === 'getStages') {
+		const listId = requireText(
+			this,
+			this.getNodeParameter('listId', itemIndex, ''),
+			'List',
+			itemIndex,
+		);
+		// The API has no endpoint for one list: its stages come with GET /lists.
+		const lists = await getAllUnpaginated(this, '/lists', 'lists', itemIndex, true);
+		const list = lists.find((candidate) => candidate.id === listId);
+		if (list === undefined) {
+			throw new NodeOperationError(this.getNode(), 'List not found', {
+				itemIndex,
+				description: `No list with ID "${listId}" in this account.`,
+			});
+		}
+		return (list.stages as IDataObject[] | undefined) ?? [];
 	}
 
 	throw new NodeOperationError(this.getNode(), `Unknown list operation "${operation}"`, {

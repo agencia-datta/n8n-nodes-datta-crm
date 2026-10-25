@@ -15,7 +15,7 @@ import {
 	getAllStages,
 	getEvents,
 	getForms,
-	getPipelines,
+	getLists,
 	getTags,
 } from '../DattaCrm/shared/loadOptions';
 import { dattaCrmRequest } from '../DattaCrm/shared/transport';
@@ -24,7 +24,7 @@ import { verifySignature } from './signature';
 
 /** Filter keys the node exposes, in the order they appear in the UI. */
 const FILTER_KEYS = [
-	'pipelineId',
+	'listId',
 	'stageId',
 	'fromStageId',
 	'toStageId',
@@ -209,12 +209,7 @@ export class DattaCrmTrigger implements INodeType {
 				description:
 					'Each event only uses the filters it supports (for example Product only applies to sale events)',
 				options: [
-					listFilter(
-						'pipelineId',
-						'Pipeline Names or IDs',
-						'getPipelines',
-						'Only events in these pipelines.',
-					),
+					listFilter('listId', 'List Names or IDs', 'getLists', 'Only events in these lists.'),
 					listFilter(
 						'stageId',
 						'Stage Names or IDs',
@@ -254,7 +249,7 @@ export class DattaCrmTrigger implements INodeType {
 	methods = {
 		loadOptions: {
 			getEvents,
-			getPipelines,
+			getLists,
 			getAllStages,
 			getTags,
 			getForms,

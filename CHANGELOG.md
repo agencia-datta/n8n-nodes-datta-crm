@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+Follows the funnel per list of Datta CRM: the stage, the value and the loss reason of a lead belong to each list, and there are no more pipelines or stage probabilities. Needs the Datta CRM version with the funnel per list.
+
+- New **Lead → Update in List** (`PATCH /leads/{id}/lists/{listId}`): stage, value and loss reason of the lead in one list.
+- New **List → Get Stages**: the funnel stages of one list. List (Get Many) also returns `hasFunnel` and `stages`.
+- New **Loss Reason → Get Many** resource (`GET /loss-reasons`).
+- Stage dropdowns come from the lists ("folder / list / stage"); in Update in List they show only the stages of the chosen list.
+- **Datta CRM Trigger**: the **Pipeline** filter is replaced by **List**. Stage filters list the stages of every list with a funnel.
+
+Breaking changes:
+
+- **Lead → Move to Stage** is removed: use **Update in List**. A workflow saved with it fails with a message pointing to the new operation.
+- **Lead → Create or Update** no longer has Pipeline, Stage and Value, and **Lead → Update** no longer has Value and Loss Reason. Values saved in these fields by 0.2.x workflows are not sent anymore (the CRM would answer `field_moved`); add an Update in List step to set them.
+- **Lead → Get Many** no longer has the Pipeline filter. The Stage filter returns leads with that stage in any list.
+- **Form → Create** no longer has Funnel Stage: the CRM ignores it, since forms do not put leads in a funnel.
+- Trigger filters by pipeline saved by 0.2.x workflows are not sent.
+- The lead output has no `pipelineId`, `stageId` or `value`: they are inside each item of `lists`.
+
 ## 0.2.0
 
 Follows the new organisation of leads in Datta CRM: origin → folder → list, with no default list.
