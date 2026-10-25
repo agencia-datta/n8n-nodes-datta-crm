@@ -5,7 +5,7 @@ n8n community nodes for [Datta CRM](https://crm.agenciadatta.com.br). They wrap 
 The package contains:
 
 - **Datta CRM API** credential
-- **Datta CRM** node: actions for leads, lists, sales, forms and email campaign drafts
+- **Datta CRM** node: actions for leads, lists, list folders, sales, forms and email campaign drafts
 - **Datta CRM Trigger** node: starts a workflow when events happen in the CRM (signed webhooks)
 
 Guide: <https://help.agenciadatta.com.br/integracoes/api/n8n/>
@@ -42,19 +42,22 @@ The credential test calls `GET /api/v1/me`.
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
 | Lead           | Create or Update, Get, Get Many, Update, Move to Stage, Add Tags, Remove Tags, Add to Lists, Remove From Lists |
 | List           | Create, Get Many                                                                                               |
+| Folder         | Get Many                                                                                                       |
 | Sale           | Create or Update, Get, Get Many, Update                                                                        |
 | Form           | Create, Get, Get Many, Update, Activate, Deactivate                                                            |
 | Email Campaign | Create Draft, Get, Get Many, Update Draft                                                                      |
 
-Pipelines, stages, tags, lists, forms, members, custom fields and webhook events are loaded from your account, so you pick them from dropdowns. You can also pass IDs with an expression.
+Pipelines, stages, tags, lists (shown as "folder / list"), list folders (shown as "origin / folder"), forms, members, custom fields and webhook events are loaded from your account, so you pick them from dropdowns. You can also pass IDs with an expression.
 
 ### Behaviour notes
 
-- **Create or Update (Lead)** matches by phone, then email, and needs at least one of them. If the lead already exists, only its empty fields are filled, and tags and lists are merged. A stage is only applied when the lead is outside the pipeline or in a won/lost stage; an active stage is kept (use Move to Stage). The Create Only mode returns an existing lead untouched. The result contains the lead and whether it was created or matched.
+- **Leads are organised as origin → folder → list.** Every list lives in a folder, and the folder sets the origin of its lists (Site, WhatsApp or Instagram). There is no default list.
+- **Create (List)** takes a folder. The folder can be left empty only when the chosen origin (Site by default) has exactly one folder; with no folder or several, the CRM returns `folder_required`. Folder (Get Many) returns the folders of every origin.
+- **Create or Update (Lead)** matches by phone, then email, and needs at least one of them. If the lead already exists, only its empty fields are filled, and tags and lists are merged. A stage is only applied when the lead is outside the pipeline or in a won/lost stage; an active stage is kept (use Move to Stage). The Create Only mode returns an existing lead untouched. The result contains the lead and whether it was created or matched. A new lead needs a list: choose one in **List Names or IDs**, or leave it empty only if the API key has a list set in Datta CRM, otherwise the CRM returns `list_required`. The lead takes the origin of its first list; **Source** is ignored by the CRM. An existing lead is accepted without a list.
 - **Update (Lead)** overwrites the fields you set. You must set at least one. Add Tags, Remove Tags, Add to Lists, Remove From Lists and Move to Stage change only that part of the lead. Tags are identified by name.
 - **Custom fields** are chosen by key. Values are converted to the type the CRM defines for each field: number, yes/no (`true`/`false`, `1`/`0`, `yes`/`no`), multiple choice (comma-separated values) or text. An invalid number or yes/no value fails the item with a clear message.
 - **Get (Lead)** can search by lead ID, email or phone. When searching by email or phone it returns the first match, or no item when nothing matches.
-- **Get Many** has Return All and Limit. With Return All the node follows the API cursor until there are no more results. Lists (Get Many) are not paginated by the API.
+- **Get Many** has Return All and Limit. With Return All the node follows the API cursor until there are no more results. Lists and Folders (Get Many) are not paginated by the API.
 - **Dates** without a time zone (what date pickers give) are read in the workflow time zone (Settings → Timezone). A value with an explicit zone or offset, such as `2026-10-20T10:00:00Z`, keeps it.
 - **Create or Update (Sale)** matches an existing sale by gateway and transaction ID (the gateway defaults to `api`) and updates only the fields you send. **Update (Sale)** cannot change the gateway or transaction ID.
 - **Forms**: Create takes the questions as a JSON array. Update takes a JSON object with only the fields to change. Activate and Deactivate turn the form on or off.

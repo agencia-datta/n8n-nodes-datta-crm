@@ -3,6 +3,7 @@ import {
 	getAllStages,
 	getCustomFields,
 	getEvents,
+	getFolders,
 	getForms,
 	getLists,
 	getMembers,
@@ -114,14 +115,46 @@ describe('loadOptions', () => {
 		expect(await getTags.call(ctx)).toEqual([{ name: 'vip', value: 'vip' }]);
 	});
 
-	it('getLists uses the list id as the value', async () => {
+	it('getLists names a list "folder / list" and uses its id as the value', async () => {
 		const { ctx, request } = createLoadOptionsContext({
-			responses: [ok([{ id: 'l1', name: 'Newsletter', isDefault: true, count: 2 }])],
+			responses: [
+				ok([
+					{
+						id: 'l1',
+						name: 'Newsletter',
+						isDefault: false,
+						folderId: 'f1',
+						folderName: 'Site',
+						count: 2,
+					},
+				]),
+			],
 		});
 
-		expect(await getLists.call(ctx)).toEqual([{ name: 'Newsletter', value: 'l1' }]);
+		expect(await getLists.call(ctx)).toEqual([{ name: 'Site / Newsletter', value: 'l1' }]);
 		expect(request.mock.calls[0][1]).toMatchObject({
 			url: 'https://crm.example.com/api/v1/lists',
+		});
+	});
+
+	it('getFolders names a folder "origin / folder" and uses its id as the value', async () => {
+		const { ctx, request } = createLoadOptionsContext({
+			responses: [
+				ok([
+					{ id: 'f1', name: 'Leads', origin: 'instagram' },
+					{ id: 'f2', name: 'Leads', origin: 'whatsapp' },
+					{ id: 'f3', name: 'Site', origin: 'site' },
+				]),
+			],
+		});
+
+		expect(await getFolders.call(ctx)).toEqual([
+			{ name: 'Instagram / Leads', value: 'f1' },
+			{ name: 'WhatsApp / Leads', value: 'f2' },
+			{ name: 'Site / Site', value: 'f3' },
+		]);
+		expect(request.mock.calls[0][1]).toMatchObject({
+			url: 'https://crm.example.com/api/v1/folders',
 		});
 	});
 

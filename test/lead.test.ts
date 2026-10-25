@@ -70,10 +70,10 @@ describe('Lead: Create or Update', () => {
 				operation: 'upsert',
 				email: '',
 				phone: '+5511999999999',
+				listIds: ['l1'],
 				additionalFields: {
 					name: 'Ana',
 					tags: 'a, b',
-					listIds: ['l1'],
 					pipelineId: 'p1',
 					stageId: 's1',
 					ownerId: 'm1',
@@ -99,6 +99,21 @@ describe('Lead: Create or Update', () => {
 			utm: { source: 'g', campaign: 'c' },
 			mode: 'createOnly',
 		});
+	});
+
+	it('merges lists still saved in Additional Fields by 0.1.x workflows', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				listIds: ['l1'],
+				additionalFields: { listIds: ['l2', 'l1'] },
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+		);
+
+		expect(calls[0].body).toEqual({ email: 'ana@example.com', listIds: ['l1', 'l2'] });
 	});
 
 	it('fetches the custom field catalog once for several items', async () => {
@@ -460,7 +475,7 @@ describe('Datta CRM node', () => {
 	});
 
 	it('registers every resource, each with an operation property', () => {
-		const resources = ['emailCampaign', 'form', 'lead', 'list', 'sale'];
+		const resources = ['emailCampaign', 'folder', 'form', 'lead', 'list', 'sale'];
 		const resource = description.properties.find((p) => p.name === 'resource');
 		expect(resource?.options?.map((o) => (o as { value: string }).value)).toEqual(resources);
 		for (const value of resources) {

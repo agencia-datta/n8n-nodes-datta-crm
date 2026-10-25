@@ -355,3 +355,25 @@ export async function buildCustomFields(
 	}
 	return result;
 }
+
+/**
+ * Get Many of an endpoint the API does not paginate (`/lists`, `/folders`): the whole array comes
+ * in one response and Limit is applied here.
+ */
+export async function getAllUnpaginated(
+	context: IExecuteFunctions,
+	path: string,
+	what: string,
+	itemIndex: number,
+): Promise<IDataObject[]> {
+	const data = await dattaCrmRequest.call(context, 'GET', path);
+	if (!Array.isArray(data)) {
+		throw new NodeOperationError(context.getNode(), 'Unexpected response from the Datta CRM API', {
+			itemIndex,
+			description: `Expected a list of ${what}. Check the base URL of the credential.`,
+		});
+	}
+	const rows = data as IDataObject[];
+	if (context.getNodeParameter('returnAll', itemIndex, false) as boolean) return rows;
+	return rows.slice(0, context.getNodeParameter('limit', itemIndex, 50) as number);
+}
