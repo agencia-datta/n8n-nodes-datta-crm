@@ -431,7 +431,6 @@ describe('Form', () => {
 			defaultListId: 'list-1',
 			isActive: false,
 			showQuestions: true,
-			funnelEntry: { enabled: true, stageId: 'stage-1' },
 			theme: { accent: '#fff' },
 			consent: { enabled: true, text: 'OK' },
 			emailMarketing: { enabled: true, text: 'Yes' },
@@ -666,7 +665,7 @@ describe('Email Campaign', () => {
 });
 
 describe('Carried over from the Task 3 review', () => {
-	it('Lead Create or Update does not send pipelineId without a stage', async () => {
+	it('Lead Create or Update never sends the pipeline or stage saved by 0.2.x', async () => {
 		const base = { resource: 'lead', operation: 'upsert', email: 'a@b.com' };
 		const created = ok({ lead: {}, result: 'created' });
 		const { calls } = await run(
@@ -680,7 +679,7 @@ describe('Carried over from the Task 3 review', () => {
 
 		expect(calls[0].body).toEqual({ email: 'a@b.com' });
 		expect(calls[1].body).toEqual({ email: 'a@b.com' });
-		expect(calls[2].body).toEqual({ email: 'a@b.com', pipelineId: 'p1', stageId: 's1' });
+		expect(calls[2].body).toEqual({ email: 'a@b.com' });
 	});
 
 	it('List Get Many throws a clear error when data is not an array', async () => {

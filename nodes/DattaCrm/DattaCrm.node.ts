@@ -14,6 +14,7 @@ import { executeFolder, folderDescription } from './resources/folder';
 import { executeForm, formDescription } from './resources/form';
 import { executeLead, leadDescription } from './resources/lead';
 import { executeList, listDescription } from './resources/list';
+import { executeLossReason, lossReasonDescription } from './resources/lossReason';
 import { executeSale, saleDescription } from './resources/sale';
 import {
 	getAllStages,
@@ -22,9 +23,9 @@ import {
 	getFolders,
 	getForms,
 	getLists,
+	getLossReasons,
 	getMembers,
 	getMembersWithNoOwner,
-	getPipelines,
 	getStages,
 	getTags,
 } from './shared/loadOptions';
@@ -35,6 +36,7 @@ const executors: Record<string, ResourceExecutor> = {
 	lead: executeLead,
 	list: executeList,
 	folder: executeFolder,
+	lossReason: executeLossReason,
 	sale: executeSale,
 	form: executeForm,
 	emailCampaign: executeEmailCampaign,
@@ -68,6 +70,7 @@ export class DattaCrm implements INodeType {
 					{ name: 'Form', value: 'form' },
 					{ name: 'Lead', value: 'lead' },
 					{ name: 'List', value: 'list' },
+					{ name: 'Loss Reason', value: 'lossReason' },
 					{ name: 'Sale', value: 'sale' },
 				],
 				default: 'lead',
@@ -75,6 +78,7 @@ export class DattaCrm implements INodeType {
 			...leadDescription,
 			...listDescription,
 			...folderDescription,
+			...lossReasonDescription,
 			...saleDescription,
 			...formDescription,
 			...emailCampaignDescription,
@@ -89,9 +93,9 @@ export class DattaCrm implements INodeType {
 			getFolders,
 			getForms,
 			getLists,
+			getLossReasons,
 			getMembers,
 			getMembersWithNoOwner,
-			getPipelines,
 			getStages,
 			getTags,
 		},

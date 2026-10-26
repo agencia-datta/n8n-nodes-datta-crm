@@ -103,12 +103,6 @@ export const leadOperations: INodeProperties[] = [
 				action: 'Get many leads',
 			},
 			{
-				name: 'Move to Stage',
-				value: 'moveToStage',
-				description: 'Move a lead to a pipeline stage',
-				action: 'Move a lead to a stage',
-			},
-			{
 				name: 'Remove From Lists',
 				value: 'removeFromLists',
 				description: 'Remove a lead from lists',
@@ -125,6 +119,12 @@ export const leadOperations: INodeProperties[] = [
 				value: 'update',
 				description: 'Update the fields of a lead, overwriting the current values',
 				action: 'Update a lead',
+			},
+			{
+				name: 'Update in List',
+				value: 'updateInList',
+				description: 'Change the stage, value or loss reason of a lead in one of its lists',
+				action: 'Update a lead in a list',
 			},
 		],
 		default: 'upsert',
@@ -208,33 +208,12 @@ export const leadFields: INodeProperties[] = [
 			},
 			{ ...ownerIdProperty },
 			{
-				displayName: 'Pipeline Name or ID',
-				name: 'pipelineId',
-				type: 'options',
-				typeOptions: { loadOptionsMethod: 'getPipelines' },
-				default: '',
-				description:
-					'Pipeline of the stage. Only sent when a stage is also chosen. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
-			},
-			{
 				displayName: 'Source',
 				name: 'source',
 				type: 'string',
 				default: '',
 				description:
 					'Deprecated: the CRM ignores it. The origin of a new lead is the origin of its first list.',
-			},
-			{
-				displayName: 'Stage Name or ID',
-				name: 'stageId',
-				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getStages',
-					loadOptionsDependsOn: ['additionalFields.pipelineId'],
-				},
-				default: '',
-				description:
-					'Stage of the pipeline. It is only applied when the lead is outside the pipeline or in a won or lost stage. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Tag Names or IDs',
@@ -258,13 +237,6 @@ export const leadFields: INodeProperties[] = [
 					{ displayName: 'Source', name: 'source', type: 'string', default: '' },
 					{ displayName: 'Term', name: 'term', type: 'string', default: '' },
 				],
-			},
-			{
-				displayName: 'Value',
-				name: 'value',
-				type: 'number',
-				default: 0,
-				description: 'Deal value of the lead',
 			},
 		],
 	},
@@ -363,25 +335,13 @@ export const leadFields: INodeProperties[] = [
 				description: 'Only leads with this phone',
 			},
 			{
-				displayName: 'Pipeline Name or ID',
-				name: 'pipelineId',
-				type: 'options',
-				typeOptions: { loadOptionsMethod: 'getPipelines' },
-				default: '',
-				description:
-					'Only leads in this pipeline. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
-			},
-			{
 				displayName: 'Stage Name or ID',
 				name: 'stageId',
 				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getStages',
-					loadOptionsDependsOn: ['filters.pipelineId'],
-				},
+				typeOptions: { loadOptionsMethod: 'getAllStages' },
 				default: '',
 				description:
-					'Only leads in this stage. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					'Only leads in this stage of a list with a funnel. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Tag Name or ID',
@@ -418,7 +378,7 @@ export const leadFields: INodeProperties[] = [
 					'removeTags',
 					'addToLists',
 					'removeFromLists',
-					'moveToStage',
+					'updateInList',
 				],
 			},
 		},
@@ -444,13 +404,6 @@ export const leadFields: INodeProperties[] = [
 				default: '',
 			},
 			{
-				displayName: 'Loss Reason',
-				name: 'lossReason',
-				type: 'string',
-				default: '',
-				description: 'Reason the deal was lost',
-			},
-			{
 				displayName: 'Name',
 				name: 'name',
 				type: 'string',
@@ -467,13 +420,6 @@ export const leadFields: INodeProperties[] = [
 				name: 'phone',
 				type: 'string',
 				default: '',
-			},
-			{
-				displayName: 'Value',
-				name: 'value',
-				type: 'number',
-				default: 0,
-				description: 'Deal value of the lead',
 			},
 		],
 	},
@@ -502,28 +448,54 @@ export const leadFields: INodeProperties[] = [
 			'A comma-separated string also works. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 
-	// Move to Stage
+	// Update in List
 	{
-		displayName: 'Pipeline Name or ID',
-		name: 'pipelineId',
+		displayName: 'List Name or ID',
+		name: 'listId',
 		type: 'options',
-		typeOptions: { loadOptionsMethod: 'getPipelines' },
+		typeOptions: { loadOptionsMethod: 'getLists' },
 		required: true,
 		default: '',
-		displayOptions: { show: { ...LEAD, operation: ['moveToStage'] } },
+		displayOptions: { show: { ...LEAD, operation: ['updateInList'] } },
 		description:
-			'Pipeline that contains the stage. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			'List of the lead whose stage, value or loss reason changes. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
-		displayName: 'Stage Name or ID',
-		name: 'stageId',
-		type: 'options',
-		typeOptions: { loadOptionsMethod: 'getStages', loadOptionsDependsOn: ['pipelineId'] },
-		required: true,
-		default: '',
-		displayOptions: { show: { ...LEAD, operation: ['moveToStage'] } },
-		description:
-			'Stage to move the lead to. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+		displayName: 'Update Fields',
+		name: 'listFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { ...LEAD, operation: ['updateInList'] } },
+		description: 'Fields to overwrite in this list. Choose at least one.',
+		options: [
+			{
+				displayName: 'Loss Reason Name or ID',
+				name: 'lossReasonId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getLossReasons' },
+				default: '',
+				description:
+					'Required when moving to a lost stage. On a lead already lost, replaces the reason. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Stage Name or ID',
+				name: 'stageId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getStages', loadOptionsDependsOn: ['listId'] },
+				default: '',
+				description:
+					'Stage of the list to move the lead to. Only lists with a funnel (WhatsApp and Instagram) have stages. Moving runs the same automations and webhooks as the board. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Value',
+				name: 'value',
+				type: 'number',
+				typeOptions: { minValue: 0 },
+				default: 0,
+				description: 'Deal value of the lead in this list, in BRL',
+			},
+		],
 	},
 ];
 
@@ -559,7 +531,6 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		});
 	}
 	const fields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-	const hasStage = typeof fields.stageId === 'string' && fields.stageId.trim() !== '';
 	const body = compact({
 		email,
 		phone,
@@ -572,11 +543,7 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 				...toStringArray(fields.listIds),
 			]),
 		],
-		// The API only accepts a pipeline together with a stage.
-		pipelineId: hasStage ? fields.pipelineId : undefined,
-		stageId: fields.stageId,
 		ownerId: fields.ownerId,
-		value: fields.value,
 		customFields: await customFieldsOf(this, fields, i),
 		source: fields.source,
 		utm: compact((fields.utm as IDataObject | undefined) ?? {}),
@@ -604,7 +571,6 @@ async function getManyLeads(this: IExecuteFunctions, i: number): Promise<IDataOb
 		phone: filters.phone,
 		tag: filters.tag,
 		listId: filters.listId,
-		pipelineId: filters.pipelineId,
 		stageId: filters.stageId,
 		updatedSince: toIsoDate(this, filters.updatedSince, 'Updated Since', i),
 	});
@@ -620,8 +586,6 @@ async function updateLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		email: fields.email,
 		phone: fields.phone,
 		ownerId: fields.ownerId === NO_OWNER_VALUE ? null : fields.ownerId,
-		value: fields.value,
-		lossReason: fields.lossReason,
 		customFields: await customFieldsOf(this, fields, i),
 	});
 	if (Object.keys(body).length === 0) {
@@ -648,10 +612,22 @@ function patchWithList(
 	};
 }
 
-async function moveLeadToStage(this: IExecuteFunctions, i: number): Promise<IDataObject> {
-	const path = leadPath(this, i);
-	const stageId = requireText(this, this.getNodeParameter('stageId', i, ''), 'Stage', i);
-	return dattaCrmRequest.call(this, 'PATCH', path, { stageId });
+async function updateLeadInList(this: IExecuteFunctions, i: number): Promise<IDataObject> {
+	const listId = requireText(this, this.getNodeParameter('listId', i, ''), 'List', i);
+	const path = `${leadPath(this, i)}/lists/${encodeURIComponent(listId)}`;
+	const fields = this.getNodeParameter('listFields', i, {}) as IDataObject;
+	const body = compact({
+		stageId: fields.stageId,
+		value: fields.value,
+		lossReasonId: fields.lossReasonId,
+	});
+	if (Object.keys(body).length === 0) {
+		throw new NodeOperationError(this.getNode(), 'Choose at least one field to update', {
+			itemIndex: i,
+			description: 'Add a stage, a value or a loss reason under "Update Fields".',
+		});
+	}
+	return dattaCrmRequest.call(this, 'PATCH', path, body);
 }
 
 const operations: Record<string, ResourceExecutor> = {
@@ -663,7 +639,7 @@ const operations: Record<string, ResourceExecutor> = {
 	removeTags: patchWithList('tags', 'removeTags', 'Choose at least one tag'),
 	addToLists: patchWithList('listIds', 'addListIds', 'Choose at least one list'),
 	removeFromLists: patchWithList('listIds', 'removeListIds', 'Choose at least one list'),
-	moveToStage: moveLeadToStage,
+	updateInList: updateLeadInList,
 };
 
 export async function executeLead(
@@ -675,6 +651,10 @@ export async function executeLead(
 	if (handler === undefined) {
 		throw new NodeOperationError(this.getNode(), `Unknown lead operation "${operation}"`, {
 			itemIndex,
+			description:
+				operation === 'moveToStage'
+					? 'Stages now belong to each list: use the "Update in List" operation.'
+					: undefined,
 		});
 	}
 	return handler.call(this, itemIndex);

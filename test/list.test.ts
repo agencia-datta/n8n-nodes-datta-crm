@@ -84,6 +84,59 @@ describe('List', () => {
 	});
 });
 
+describe('List: Get Stages', () => {
+	const withStages = [
+		{ ...lists[0], hasFunnel: false, stages: [] },
+		{
+			...lists[2],
+			hasFunnel: true,
+			stages: [
+				{ id: 's1', name: 'New', kind: 'active', position: 0 },
+				{ id: 's2', name: 'Lost', kind: 'lost', position: 1 },
+			],
+		},
+	];
+
+	it('returns the stages of the list, one item each', async () => {
+		const { items, calls } = await run({ resource: 'list', operation: 'getStages', listId: 'l3' }, [
+			withStages,
+		]);
+
+		expect(calls[0]).toMatchObject({ method: 'GET', url: `${BASE}/lists` });
+		expect(items.map((i) => i.json)).toEqual(withStages[1].stages);
+	});
+
+	it('returns no items for a list without a funnel', async () => {
+		const { items } = await run({ resource: 'list', operation: 'getStages', listId: 'l1' }, [
+			withStages,
+		]);
+
+		expect(items).toEqual([]);
+	});
+
+	it('throws when the list does not exist', async () => {
+		await expect(
+			run({ resource: 'list', operation: 'getStages', listId: 'nope' }, [withStages]),
+		).rejects.toThrow('List not found');
+	});
+});
+
+describe('Loss Reason', () => {
+	it('Get Many with Return All returns every reason from /loss-reasons', async () => {
+		const reasons = [
+			{ id: 'r1', name: 'No budget' },
+			{ id: 'r2', name: 'Price' },
+		];
+		const { items, calls } = await run(
+			{ resource: 'lossReason', operation: 'getAll', returnAll: true },
+			[reasons],
+		);
+
+		expect(calls[0]).toMatchObject({ method: 'GET', url: `${BASE}/loss-reasons` });
+		expect(items.map((i) => i.json)).toEqual(reasons);
+	});
+});
+
 describe('Folder', () => {
 	it('Get Many with Return All returns every folder', async () => {
 		const { items, calls } = await run(
