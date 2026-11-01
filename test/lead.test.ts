@@ -98,6 +98,64 @@ describe('Lead: Create or Update', () => {
 		});
 	});
 
+	it('sends Captured At as ISO 8601 and Event ID trimmed', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				additionalFields: { occurredAt: '2026-10-30T09:15:00-03:00', eventId: '  evt-1  ' },
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+		);
+
+		expect(calls[0].body).toEqual({
+			email: 'ana@example.com',
+			occurredAt: '2026-10-30T12:15:00.000Z',
+			eventId: 'evt-1',
+		});
+	});
+
+	it('reads a Captured At without a zone in the workflow timezone', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				additionalFields: { occurredAt: '2026-10-30T09:15:00' },
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+			{ timezone: 'America/Sao_Paulo' },
+		);
+
+		expect(calls[0].body).toEqual({ email: 'ana@example.com', occurredAt: '2026-10-30T12:15:00.000Z' });
+	});
+
+	it('omits an empty Captured At and Event ID, and rejects a long Event ID', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				additionalFields: { occurredAt: '', eventId: '   ' },
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+		);
+		expect(calls[0].body).toEqual({ email: 'ana@example.com' });
+
+		await expect(
+			run(
+				{
+					resource: 'lead',
+					operation: 'upsert',
+					email: 'ana@example.com',
+					additionalFields: { eventId: 'x'.repeat(201) },
+				},
+				[],
+			),
+		).rejects.toThrow('"Event ID" must have at most 200 characters');
+	});
+
 	it('merges lists still saved in Additional Fields by 0.1.x workflows', async () => {
 		const { calls } = await run(
 			{

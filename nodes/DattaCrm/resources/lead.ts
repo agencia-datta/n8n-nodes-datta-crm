@@ -167,7 +167,7 @@ export const leadFields: INodeProperties[] = [
 		default: [],
 		displayOptions: { show: { ...LEAD, operation: ['upsert'] } },
 		description:
-			'Lists to add the lead to; a new lead takes the origin of the first one. A new lead needs a list: leave it empty only if the API key has a list set in Datta CRM, otherwise the CRM returns "list_required". An existing lead is accepted without a list. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			'Lists to add the lead to; a new lead takes the origin of the first one. A new lead needs a list, otherwise the CRM returns "list_required". An existing lead is accepted without a list. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
 		displayName: 'Additional Fields',
@@ -177,7 +177,23 @@ export const leadFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { ...LEAD, operation: ['upsert'] } },
 		options: [
+			{
+				displayName: 'Captured At',
+				name: 'occurredAt',
+				type: 'dateTime',
+				default: '',
+				description:
+					'When the lead was captured in the source tool. Without it, the time of arrival is used. A value without a time zone is read in the workflow time zone; it cannot be more than 5 minutes in the future (the CRM returns 400).',
+			},
 			customFieldsProperty,
+			{
+				displayName: 'Event ID',
+				name: 'eventId',
+				type: 'string',
+				default: '',
+				description:
+					'ID of this delivery in the source tool (1 to 200 characters). Resending the same ID for the same lead does not record another capture.',
+			},
 			{
 				displayName: 'Mode',
 				name: 'mode',
@@ -521,6 +537,26 @@ function leadPath(context: IExecuteFunctions, itemIndex: number): string {
 	return `/leads/${encodeURIComponent(id)}`;
 }
 
+const EVENT_ID_MAX = 200;
+
+/** The trimmed Event ID (undefined when empty); the CRM accepts 1 to 200 characters. */
+function eventIdOf(
+	context: IExecuteFunctions,
+	value: unknown,
+	itemIndex: number,
+): string | undefined {
+	const text = value === undefined || value === null ? '' : String(value).trim();
+	if (text === '') return undefined;
+	if (text.length > EVENT_ID_MAX) {
+		throw new NodeOperationError(
+			context.getNode(),
+			`"Event ID" must have at most ${EVENT_ID_MAX} characters`,
+			{ itemIndex, description: `Received ${text.length} characters.` },
+		);
+	}
+	return text;
+}
+
 async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObject> {
 	const email = String(this.getNodeParameter('email', i, '')).trim();
 	const phone = String(this.getNodeParameter('phone', i, '')).trim();
@@ -547,6 +583,8 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		customFields: await customFieldsOf(this, fields, i),
 		source: fields.source,
 		utm: compact((fields.utm as IDataObject | undefined) ?? {}),
+		occurredAt: toIsoDate(this, fields.occurredAt, 'Captured At', i),
+		eventId: eventIdOf(this, fields.eventId, i),
 		mode: fields.mode,
 	});
 	return dattaCrmRequest.call(this, 'POST', '/leads', body);
