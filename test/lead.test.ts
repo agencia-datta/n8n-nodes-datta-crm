@@ -177,7 +177,10 @@ describe('Lead: Create or Update', () => {
 			{ timezone: 'America/Sao_Paulo' },
 		);
 
-		expect(calls[0].body).toEqual({ email: 'ana@example.com', occurredAt: '2026-10-30T12:15:00.000Z' });
+		expect(calls[0].body).toEqual({
+			email: 'ana@example.com',
+			occurredAt: '2026-10-30T12:15:00.000Z',
+		});
 	});
 
 	it('omits an empty Captured At and Event ID, and rejects a long Event ID', async () => {
@@ -646,7 +649,16 @@ describe('Datta CRM node', () => {
 	});
 
 	it('registers every resource, each with an operation property', () => {
-		const resources = ['emailCampaign', 'folder', 'form', 'lead', 'list', 'lossReason', 'sale'];
+		const resources = [
+			'customField',
+			'emailCampaign',
+			'folder',
+			'form',
+			'lead',
+			'list',
+			'lossReason',
+			'sale',
+		];
 		const resource = description.properties.find((p) => p.name === 'resource');
 		expect(resource?.options?.map((o) => (o as { value: string }).value)).toEqual(resources);
 		for (const value of resources) {

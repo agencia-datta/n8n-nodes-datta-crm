@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+Creates custom fields from n8n, so a new form field does not need a trip to the CRM first. Needs the Datta CRM version with `POST /custom-fields` (`create_custom_field`): older versions return 404. The credential does not change (API Key and Base URL).
+
+- New **Custom Field** resource: **Create** (`POST /custom-fields`: Name, Type, Options for select types and an optional Key derived from the name) and **Get Many** (`GET /custom-fields`). Create is idempotent by key: an existing field with the same key and type is returned unchanged (`result: matched`); another type returns `conflict`.
+- **Lead → Create or Update** has a new **Create Missing Custom Fields** option in Additional Fields, off by default: before sending the lead, it creates as text the keys of Custom Fields that do not exist in the account yet, once per execution.
+
 ## 0.5.0
 
 Follows the click tracking of `POST /leads` in Datta CRM. Needs the Datta CRM version with `utm.id` and `tracking` in `POST /leads`: older versions accept the request but drop these fields. The credential does not change (API Key and Base URL).

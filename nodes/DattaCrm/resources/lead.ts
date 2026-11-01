@@ -8,6 +8,7 @@ import { dattaCrmRequest, dattaCrmRequestAll, dattaCrmRequestPage } from '../sha
 import {
 	NO_OWNER_VALUE,
 	buildCustomFields,
+	createMissingCustomFields,
 	compact,
 	requireText,
 	toIsoDate,
@@ -185,6 +186,14 @@ export const leadFields: INodeProperties[] = [
 				description:
 					'When the lead was captured in the source tool. Without it, the time of arrival is used. A value without a time zone is read in the workflow time zone; it cannot be more than 5 minutes in the future (the CRM returns 400).',
 			},
+			{
+				displayName: 'Create Missing Custom Fields',
+				name: 'createMissingCustomFields',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to create in the CRM, as text fields named after their keys, the keys of Custom Fields that do not exist in the account yet, before sending the lead. Keys accept letters without accents, numbers and underscores (up to 40 characters).',
+			},
 			customFieldsProperty,
 			{
 				displayName: 'Event ID',
@@ -254,7 +263,8 @@ export const leadFields: INodeProperties[] = [
 						name: 'sourceId',
 						type: 'string',
 						default: '',
-						description: 'ID of the source ad of a Click to WhatsApp ad (source_id), up to 500 characters',
+						description:
+							'ID of the source ad of a Click to WhatsApp ad (source_id), up to 500 characters',
 					},
 					{
 						displayName: 'Click to WhatsApp Click ID',
@@ -291,8 +301,7 @@ export const leadFields: INodeProperties[] = [
 						name: 'referrer',
 						type: 'string',
 						default: '',
-						description:
-							'URL the person came from before the capture page (up to 2048 characters)',
+						description: 'URL the person came from before the capture page (up to 2048 characters)',
 					},
 					{
 						displayName: 'TikTok Click ID',
@@ -649,6 +658,9 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		});
 	}
 	const fields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
+	if (fields.createMissingCustomFields === true) {
+		await createMissingCustomFields(this, (fields.customFields as FixedEntries)?.entries);
+	}
 	const body = compact({
 		email,
 		phone,

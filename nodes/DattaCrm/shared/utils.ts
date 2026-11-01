@@ -327,6 +327,42 @@ function typedValue(
 	}
 }
 
+function findDefinition(
+	catalog: CustomFieldDefinition[],
+	key: string,
+): CustomFieldDefinition | undefined {
+	const lower = key.toLowerCase();
+	return (
+		catalog.find((field) => field.key === key) ??
+		catalog.find((field) => field.key.toLowerCase() === lower)
+	);
+}
+
+/**
+ * Creates as text the custom fields whose keys are not in the account yet, named after the key,
+ * before the lead is sent. The created fields join the cached catalog, so later items of the same
+ * execution do not create them again. A key the CRM refuses (format, native field) fails the item
+ * with the CRM message.
+ */
+export async function createMissingCustomFields(
+	context: IExecuteFunctions,
+	entries: CustomFieldEntry[] | undefined,
+): Promise<void> {
+	const keys = (entries ?? []).map((entry) => (entry.key ?? '').trim()).filter((key) => key !== '');
+	if (keys.length === 0) return;
+
+	const catalog = await getCatalog(context);
+	for (const key of keys) {
+		if (findDefinition(catalog, key) !== undefined) continue;
+		const created = (await dattaCrmRequest.call(context, 'POST', '/custom-fields', {
+			key,
+			label: key,
+			type: 'text',
+		})) as CustomFieldDefinition;
+		catalog.push(created);
+	}
+}
+
 /**
  * Builds the `customFields` object of a lead from the key/value rows of the node, typing each
  * value with the account's custom field catalog. The catalog is only requested when at least one
@@ -344,10 +380,7 @@ export async function buildCustomFields(
 	const result: IDataObject = {};
 	for (const row of rows) {
 		const key = (row.key as string).trim();
-		const lower = key.toLowerCase();
-		const definition =
-			catalog.find((field) => field.key === key) ??
-			catalog.find((field) => field.key.toLowerCase() === lower);
+		const definition = findDefinition(catalog, key);
 		result[key] =
 			definition === undefined
 				? (row.value as IDataObject[string])
