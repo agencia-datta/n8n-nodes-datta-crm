@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+Follows the click tracking of `POST /leads` in Datta CRM. Needs the Datta CRM version with `utm.id` and `tracking` in `POST /leads`: older versions accept the request but drop these fields. The credential does not change (API Key and Base URL).
+
+- **Lead → Create or Update** has a new **Tracking** collection in Additional Fields: **Facebook Click ID** (`fbclid`), **Google Click ID** (`gclid`), **TikTok Click ID** (`ttclid`), **Click to WhatsApp Click ID** (`ctwa_clid`), **Ad Source ID** (`source_id`), **Page URL** and **Referrer**. They go to the lead and to the capture in its journey. Only filled fields are sent, trimmed.
+- The **UTM** collection has a new **ID** field (`utm_id`).
+
 ## 0.4.0
 
 Follows the lead capture of Datta CRM: every accepted delivery of **Lead → Create or Update** records a capture in the lead's journey. Needs the Datta CRM version with `occurredAt` and `eventId` in `POST /leads`. The credential does not change (API Key and Base URL).

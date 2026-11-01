@@ -241,6 +241,69 @@ export const leadFields: INodeProperties[] = [
 					'Tags to add to the lead, identified by name. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
+				displayName: 'Tracking',
+				name: 'tracking',
+				type: 'collection',
+				placeholder: 'Add Tracking Parameter',
+				default: {},
+				description:
+					'Click and page tracking of this delivery. It goes to the lead and to the capture in its journey; on an existing lead, a filled value replaces the previous one and an empty one is not sent.',
+				options: [
+					{
+						displayName: 'Ad Source ID',
+						name: 'sourceId',
+						type: 'string',
+						default: '',
+						description: 'ID of the source ad of a Click to WhatsApp ad (source_id), up to 500 characters',
+					},
+					{
+						displayName: 'Click to WhatsApp Click ID',
+						name: 'ctwaClid',
+						type: 'string',
+						default: '',
+						description: 'Click ID of a Click to WhatsApp ad (ctwa_clid), up to 500 characters',
+					},
+					{
+						displayName: 'Facebook Click ID',
+						name: 'fbclid',
+						type: 'string',
+						default: '',
+						description: 'Meta (Facebook and Instagram) click ID (fbclid), up to 500 characters',
+					},
+					{
+						displayName: 'Google Click ID',
+						name: 'gclid',
+						type: 'string',
+						default: '',
+						description: 'Google Ads click ID (gclid), up to 500 characters',
+					},
+					{
+						displayName: 'Page URL',
+						name: 'pageUrl',
+						type: 'string',
+						default: '',
+						placeholder: 'https://example.com/offer',
+						description:
+							'URL of the page where the lead was captured (up to 2048 characters). Also used as the conversion URL of the lead.',
+					},
+					{
+						displayName: 'Referrer',
+						name: 'referrer',
+						type: 'string',
+						default: '',
+						description:
+							'URL the person came from before the capture page (up to 2048 characters)',
+					},
+					{
+						displayName: 'TikTok Click ID',
+						name: 'ttclid',
+						type: 'string',
+						default: '',
+						description: 'TikTok click ID (ttclid), up to 500 characters',
+					},
+				],
+			},
+			{
 				displayName: 'UTM',
 				name: 'utm',
 				type: 'collection',
@@ -249,6 +312,13 @@ export const leadFields: INodeProperties[] = [
 				options: [
 					{ displayName: 'Campaign', name: 'campaign', type: 'string', default: '' },
 					{ displayName: 'Content', name: 'content', type: 'string', default: '' },
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						default: '',
+						description: 'Campaign ID (utm_id)',
+					},
 					{ displayName: 'Medium', name: 'medium', type: 'string', default: '' },
 					{ displayName: 'Source', name: 'source', type: 'string', default: '' },
 					{ displayName: 'Term', name: 'term', type: 'string', default: '' },
@@ -557,6 +627,18 @@ function eventIdOf(
 	return text;
 }
 
+/** Text fields of a collection, trimmed, without the empty ones. */
+function trimmedTexts(raw: unknown): IDataObject {
+	const result: IDataObject = {};
+	if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return result;
+	for (const [key, value] of Object.entries(raw as IDataObject)) {
+		if (value === undefined || value === null) continue;
+		const text = String(value).trim();
+		if (text !== '') result[key] = text;
+	}
+	return result;
+}
+
 async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObject> {
 	const email = String(this.getNodeParameter('email', i, '')).trim();
 	const phone = String(this.getNodeParameter('phone', i, '')).trim();
@@ -583,6 +665,7 @@ async function upsertLead(this: IExecuteFunctions, i: number): Promise<IDataObje
 		customFields: await customFieldsOf(this, fields, i),
 		source: fields.source,
 		utm: compact((fields.utm as IDataObject | undefined) ?? {}),
+		tracking: trimmedTexts(fields.tracking),
 		occurredAt: toIsoDate(this, fields.occurredAt, 'Captured At', i),
 		eventId: eventIdOf(this, fields.eventId, i),
 		mode: fields.mode,
