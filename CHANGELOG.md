@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+Follows the lead capture of Datta CRM: every accepted delivery of **Lead → Create or Update** records a capture in the lead's journey. Needs the Datta CRM version with `occurredAt` and `eventId` in `POST /leads`. The credential does not change (API Key and Base URL).
+
+- **Lead → Create or Update** has two new optional fields in Additional Fields: **Captured At** (`occurredAt`: when the lead was captured in the source tool; without it the time of arrival is used, and more than 5 minutes in the future returns 400) and **Event ID** (`eventId`: ID of the delivery in the source tool, 1 to 200 characters, so a resend does not record another capture). A Captured At without a time zone is read in the workflow time zone and sent as ISO 8601.
+- The lists (**List Names or IDs**) and tags always come from the node: the description no longer mentions a list set in the API key.
+
 ## 0.3.0
 
 Follows the funnel per list of Datta CRM: the stage, the value and the loss reason of a lead belong to each list, and there are no more pipelines or stage probabilities. Needs the Datta CRM version with the funnel per list.
