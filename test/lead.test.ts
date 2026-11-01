@@ -98,6 +98,55 @@ describe('Lead: Create or Update', () => {
 		});
 	});
 
+	it('sends UTM ID and the filled tracking fields trimmed, without the empty ones', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				additionalFields: {
+					utm: { source: 'meta', id: '120' },
+					tracking: {
+						fbclid: ' FB-1 ',
+						gclid: '',
+						ttclid: '   ',
+						ctwaClid: 'CTWA-1',
+						sourceId: 'AD-1',
+						pageUrl: 'https://example.com/offer?utm_source=meta',
+						referrer: 'https://www.instagram.com/',
+					},
+				},
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+		);
+
+		expect(calls[0].body).toEqual({
+			email: 'ana@example.com',
+			utm: { source: 'meta', id: '120' },
+			tracking: {
+				fbclid: 'FB-1',
+				ctwaClid: 'CTWA-1',
+				sourceId: 'AD-1',
+				pageUrl: 'https://example.com/offer?utm_source=meta',
+				referrer: 'https://www.instagram.com/',
+			},
+		});
+	});
+
+	it('omits Tracking when every tracking field is empty', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'upsert',
+				email: 'ana@example.com',
+				additionalFields: { tracking: { fbclid: '', pageUrl: '  ' } },
+			},
+			[ok({ lead: lead(), result: 'created' }, undefined, 201)],
+		);
+
+		expect(calls[0].body).toEqual({ email: 'ana@example.com' });
+	});
+
 	it('sends Captured At as ISO 8601 and Event ID trimmed', async () => {
 		const { calls } = await run(
 			{
