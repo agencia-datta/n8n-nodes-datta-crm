@@ -9,6 +9,7 @@ import {
 	type INodeTypeDescription,
 	type JsonObject,
 } from 'n8n-workflow';
+import { adMetricDescription, executeAdMetric } from './resources/adMetrics';
 import { customFieldDescription, executeCustomField } from './resources/customField';
 import { emailCampaignDescription, executeEmailCampaign } from './resources/emailCampaign';
 import { executeFolder, folderDescription } from './resources/folder';
@@ -40,6 +41,7 @@ const executors: Record<string, ResourceExecutor> = {
 	folder: executeFolder,
 	lossReason: executeLossReason,
 	sale: executeSale,
+	adMetric: executeAdMetric,
 	form: executeForm,
 	emailCampaign: executeEmailCampaign,
 };
@@ -53,7 +55,7 @@ export class DattaCrm implements INodeType {
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description:
-			'Create and update leads, sales, custom fields, forms and email drafts in Datta CRM',
+			'Create and update leads, sales, custom fields, forms and email drafts, and send ad metrics, in Datta CRM',
 		defaults: {
 			name: 'Datta CRM',
 		},
@@ -68,6 +70,7 @@ export class DattaCrm implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{ name: 'Ad Metric', value: 'adMetric' },
 					{ name: 'Custom Field', value: 'customField' },
 					{ name: 'Email Campaign', value: 'emailCampaign' },
 					{ name: 'Folder', value: 'folder' },
@@ -85,6 +88,7 @@ export class DattaCrm implements INodeType {
 			...folderDescription,
 			...lossReasonDescription,
 			...saleDescription,
+			...adMetricDescription,
 			...formDescription,
 			...emailCampaignDescription,
 		],

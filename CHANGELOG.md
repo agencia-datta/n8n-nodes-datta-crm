@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+Sends daily ad metrics to Datta CRM, so a flow in n8n can feed the media panels. Needs the Datta CRM version with `POST /api/v1/ad-metrics`: older versions return 404. The credential does not change (API Key and Base URL); the key needs read and write access.
+
+- New **Ad Metric** resource with **Send** (`POST /ad-metrics`): **Platform** (Meta, Google, TikTok or LinkedIn) and **Records**. With **Use Input Items**, every input item is a record already in camelCase (`date` and `adId` are required; optional: `accountId`, `accountName`, `campaignId`, `campaignName`, `adsetId`, `adsetName`, `adName`, `adStatus`, `adUrl`, `adThumbnail`, `spend`, `impressions`, `reach`, `clicks`, `pageViews`, `platformLeads`, `checkouts`, `platformPurchases`, `platformRevenue`, `messagingStarted`, `currency` and `extra`). With **JSON**, the list of records is written in the node (or comes from an expression).
+- The records are split into batches of up to 500 (**Batch Size**, default and maximum 500) and the node returns one item per batch with `{ "upserted": n }`. A record of the same day and ad is updated, so a resend does not duplicate. When a batch fails, the error shows which batch it was.
+
 ## 0.6.0
 
 Creates custom fields from n8n, so a new form field does not need a trip to the CRM first. Needs the Datta CRM version with `POST /custom-fields` (`create_custom_field`): older versions return 404. The credential does not change (API Key and Base URL).
