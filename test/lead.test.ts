@@ -650,6 +650,7 @@ describe('Datta CRM node', () => {
 
 	it('registers every resource, each with an operation property', () => {
 		const resources = [
+			'adMetric',
 			'customField',
 			'emailCampaign',
 			'folder',
