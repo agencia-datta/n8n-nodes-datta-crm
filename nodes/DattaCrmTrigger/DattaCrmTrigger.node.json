@@ -6,12 +6,12 @@
 	"resources": {
 		"credentialDocumentation": [
 			{
-				"url": "https://help.agenciadatta.com.br/integracoes/api/n8n/"
+				"url": "https://ajuda.dattacrm.com.br/integracoes/api/n8n/"
 			}
 		],
 		"primaryDocumentation": [
 			{
-				"url": "https://help.agenciadatta.com.br/integracoes/api/n8n/"
+				"url": "https://ajuda.dattacrm.com.br/integracoes/api/n8n/"
 			}
 		]
 	}

@@ -1,6 +1,6 @@
 # n8n-nodes-datta-crm
 
-n8n community nodes for [Datta CRM](https://crm.agenciadatta.com.br). They wrap the Datta CRM public REST API (`/api/v1`) so you can manage leads, sales, forms and email drafts from a workflow, and start workflows from CRM events.
+n8n community nodes for [Datta CRM](https://dattacrm.com.br). They wrap the Datta CRM public REST API (`/api/v1`) so you can manage leads, sales, forms and email drafts from a workflow, and start workflows from CRM events.
 
 The package contains:
 
@@ -8,8 +8,8 @@ The package contains:
 - **Datta CRM** node: actions for leads, lists, list folders, custom fields, sales, forms and email campaign drafts
 - **Datta CRM Trigger** node: starts a workflow when events happen in the CRM (signed webhooks)
 
-Guide: <https://help.agenciadatta.com.br/integracoes/api/n8n/>
-API reference: <https://crm.agenciadatta.com.br/api/v1/openapi.json>
+Guide: <https://ajuda.dattacrm.com.br/integracoes/api/n8n/>
+API reference: <https://dattacrm.com.br/api/v1/openapi.json>
 
 ## Installation
 
@@ -32,7 +32,7 @@ Restart n8n afterwards. See the [n8n community nodes documentation](https://docs
 | Field    | Description                                                                                          |
 | -------- | ---------------------------------------------------------------------------------------------------- |
 | API Key  | The key you created.                                                                                 |
-| Base URL | Defaults to `https://crm.agenciadatta.com.br`. Only change it if you were given a different address. |
+| Base URL | Defaults to `https://dattacrm.com.br`. Only change it if you were given a different address. |
 
 The credential test calls `GET /api/v1/me`.
 

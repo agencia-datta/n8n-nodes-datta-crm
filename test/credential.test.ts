@@ -46,7 +46,7 @@ describe('DattaCrmApi credential', () => {
 		expect(credential.name).toBe('dattaCrmApi');
 		expect(credential.displayName).toBe('Datta CRM API');
 		expect(credential.documentationUrl).toBe(
-			'https://help.agenciadatta.com.br/integracoes/api/n8n/',
+			'https://ajuda.dattacrm.com.br/integracoes/api/n8n/',
 		);
 		expect(credential.icon).toEqual({
 			light: 'file:../nodes/DattaCrm/dattaCrm.svg',
@@ -74,7 +74,7 @@ describe('DattaCrmApi credential', () => {
 		expect(baseUrl).toMatchObject({
 			displayName: 'Base URL',
 			type: 'string',
-			default: 'https://crm.agenciadatta.com.br',
+			default: 'https://dattacrm.com.br',
 		});
 		expect(baseUrl?.description).toBe(
 			'Only change this if you were given a different Datta CRM address.',
