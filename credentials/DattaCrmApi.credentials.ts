@@ -16,7 +16,7 @@ export class DattaCrmApi implements ICredentialType {
 		dark: 'file:../nodes/DattaCrm/dattaCrm.dark.svg',
 	};
 
-	documentationUrl = 'https://help.agenciadatta.com.br/integracoes/api/n8n/';
+	documentationUrl = 'https://ajuda.dattacrm.com.br/integracoes/api/n8n/';
 
 	properties: INodeProperties[] = [
 		{
@@ -34,7 +34,7 @@ export class DattaCrmApi implements ICredentialType {
 			displayName: 'Base URL',
 			name: 'baseUrl',
 			type: 'string',
-			default: 'https://crm.agenciadatta.com.br',
+			default: 'https://dattacrm.com.br',
 			required: true,
 			description: 'Only change this if you were given a different Datta CRM address.',
 		},

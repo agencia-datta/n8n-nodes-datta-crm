@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+Datta CRM moved to `https://dattacrm.com.br` (the old address keeps working). New credentials now default to the new Base URL, and the README and help links point to `ajuda.dattacrm.com.br`. Credentials already saved keep the Base URL they have; nothing changes in the nodes.
+
 ## 0.7.0
 
 Sends daily ad metrics to Datta CRM, so a flow in n8n can feed the media panels. Needs the Datta CRM version with `POST /api/v1/ad-metrics`: older versions return 404. The credential does not change (API Key and Base URL); the key needs read and write access.
