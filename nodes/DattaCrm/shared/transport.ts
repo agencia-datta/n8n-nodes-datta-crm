@@ -104,6 +104,8 @@ async function send(
 		method,
 		url: apiUrl(credentials.baseUrl, path),
 		qs: cleanQuery(qs),
+		// Repeated keys (`?tag=a&tag=b`) for list filters, as the API expects.
+		arrayFormat: 'repeat',
 		json: true,
 		ignoreHttpStatusErrors: true,
 		returnFullResponse: true,

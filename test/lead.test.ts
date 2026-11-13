@@ -435,6 +435,60 @@ describe('Lead: Get Many', () => {
 		});
 	});
 
+	it('sends capturedSince, origin and includeHidden, with capturedSince in ISO', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'getAll',
+				returnAll: false,
+				limit: 5,
+				filters: {
+					capturedSince: '2026-10-30T00:00:00',
+					origin: 'whatsapp',
+					includeHidden: true,
+				},
+			},
+			[page([], null)],
+			{ timezone: 'America/Sao_Paulo' },
+		);
+
+		expect(calls[0].qs).toEqual({
+			capturedSince: '2026-10-30T03:00:00.000Z',
+			origin: 'whatsapp',
+			includeHidden: 'true',
+			limit: 5,
+		});
+	});
+
+	it('leaves includeHidden out when it is off', async () => {
+		const { calls } = await run(
+			{
+				resource: 'lead',
+				operation: 'getAll',
+				returnAll: false,
+				limit: 5,
+				filters: { includeHidden: false, capturedSince: '2026-10-30T00:00:00.000Z' },
+			},
+			[page([], null)],
+		);
+
+		expect(calls[0].qs).toEqual({ capturedSince: '2026-10-30T00:00:00.000Z', limit: 5 });
+	});
+
+	it('rejects an invalid capturedSince', async () => {
+		await expect(
+			run(
+				{
+					resource: 'lead',
+					operation: 'getAll',
+					returnAll: true,
+					filters: { capturedSince: 'garbage' },
+				},
+				[],
+			),
+		).rejects.toThrow('"Captured Since" is not a valid date');
+	});
+
 	it('rejects an invalid updatedSince', async () => {
 		await expect(
 			run(

@@ -13,6 +13,7 @@ import {
 	requireText,
 	runOperation,
 	toIsoDate,
+	toStringArray,
 	type ResourceExecutor,
 } from '../shared/utils';
 
@@ -150,6 +151,7 @@ const utmProperty: INodeProperties = {
 
 /** Fields shared by Create or Update and Update, in alphabetical order. */
 const sharedOptions: Record<
+	| 'adId'
 	| 'buyer'
 	| 'currency'
 	| 'mirror'
@@ -160,6 +162,13 @@ const sharedOptions: Record<
 	| 'utm',
 	INodeProperties
 > = {
+	adId: {
+		displayName: 'Ad ID',
+		name: 'adId',
+		type: 'string',
+		default: '',
+		description: 'ID of the ad that generated the sale (up to 200 characters)',
+	},
 	buyer: buyerProperty,
 	currency: {
 		displayName: 'Currency',
@@ -292,6 +301,7 @@ export const saleFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { ...SALE, operation: ['upsert'] } },
 		options: [
+			sharedOptions.adId,
 			sharedOptions.buyer,
 			sharedOptions.currency,
 			sharedOptions.mirror,
@@ -307,6 +317,14 @@ export const saleFields: INodeProperties[] = [
 			sharedOptions.paymentType,
 			sharedOptions.productId,
 			sharedOptions.productName,
+			{
+				displayName: 'Tags',
+				name: 'tags',
+				type: 'string',
+				default: '',
+				description:
+					'Sale tags to add, by name, separated by commas (up to 30). Only adds: the tags the sale already has are kept.',
+			},
 			sharedOptions.utm,
 		],
 	},
@@ -333,6 +351,14 @@ export const saleFields: INodeProperties[] = [
 		description:
 			'Fields to change. Choose at least one. The gateway and transaction ID cannot be changed.',
 		options: [
+			{
+				displayName: 'Add Tags',
+				name: 'addTags',
+				type: 'string',
+				default: '',
+				description: 'Sale tags to add, by name, separated by commas (up to 30)',
+			},
+			sharedOptions.adId,
 			sharedOptions.buyer,
 			sharedOptions.currency,
 			sharedOptions.mirror,
@@ -340,6 +366,14 @@ export const saleFields: INodeProperties[] = [
 			sharedOptions.paymentType,
 			sharedOptions.productId,
 			sharedOptions.productName,
+			{
+				displayName: 'Remove Tags',
+				name: 'removeTags',
+				type: 'string',
+				default: '',
+				description:
+					'Sale tags to remove, by name, separated by commas (up to 30). Tags the sale does not have are ignored.',
+			},
 			statusProperty,
 			sharedOptions.utm,
 			valueProperty,
@@ -391,7 +425,8 @@ export const saleFields: INodeProperties[] = [
 				name: 'occurredSince',
 				type: 'dateTime',
 				default: '',
-				description: 'Only sales that happened at or after this date',
+				description:
+					'Only sales whose sale date (Occurred At) is at or after this date. Sales without a sale date are left out. It is not the date the sale entered the CRM.',
 			},
 			{
 				displayName: 'Status',
@@ -402,6 +437,14 @@ export const saleFields: INodeProperties[] = [
 				),
 				default: 'paid',
 				description: 'Only sales with this status',
+			},
+			{
+				displayName: 'Tags',
+				name: 'tags',
+				type: 'string',
+				default: '',
+				description:
+					'Only sales with any of these sale tags, by name, separated by commas (up to 30, case-insensitive)',
 			},
 			{
 				displayName: 'Transaction ID',
@@ -460,6 +503,7 @@ function sharedBody(
 		productId: fields.productId,
 		productName: fields.productName,
 		paymentType: fields.paymentType,
+		adId: typeof fields.adId === 'string' ? fields.adId.trim() : fields.adId,
 		occurredAt: toIsoDate(context, fields.occurredAt, 'Occurred At', itemIndex),
 		buyer: nested(fields.buyer),
 		utm: nested(fields.utm),
@@ -482,6 +526,7 @@ async function upsertSale(this: IExecuteFunctions, i: number): Promise<IDataObje
 		status: this.getNodeParameter('status', i) as string,
 		value: numberOf(this, this.getNodeParameter('value', i), 'Value', i),
 		...sharedBody(this, fields, i),
+		tags: toStringArray(fields.tags),
 	});
 	return dattaCrmRequest.call(this, 'POST', '/sales', body);
 }
@@ -498,6 +543,7 @@ async function getManySales(this: IExecuteFunctions, i: number): Promise<IDataOb
 		transactionId: filters.transactionId,
 		leadId: filters.leadId,
 		occurredSince: toIsoDate(this, filters.occurredSince, 'Occurred Since', i),
+		tag: toStringArray(filters.tags),
 	});
 	return fetchMany(this, i, '/sales', qs);
 }
@@ -509,6 +555,8 @@ async function updateSale(this: IExecuteFunctions, i: number): Promise<IDataObje
 		status: fields.status,
 		value: fields.value === undefined ? undefined : numberOf(this, fields.value, 'Value', i),
 		...sharedBody(this, fields, i),
+		addTags: toStringArray(fields.addTags),
+		removeTags: toStringArray(fields.removeTags),
 	});
 	requireNonEmptyBody(this, body, i, 'Update Fields');
 	return dattaCrmRequest.call(this, 'PATCH', path, body);

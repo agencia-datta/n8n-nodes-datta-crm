@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+Finds new sign-ups and filters sales by tag, so a flow can work on recent leads and buyers without relying on when the record was last saved. Needs the Datta CRM version with `capturedSince` in `GET /leads` (`origin`, `includeHidden`, sale tags and `adId` already exist in the API). The credential does not change (API Key and Base URL).
+
+- **Lead → Get Many** has new filters: **Captured Since** (`capturedSince`: leads that signed up at or after the date; every sign-up counts, and a lead without a sign-up record counts by its sign-up date), **Origin** (site, WhatsApp or Instagram) and **Include Hidden**. **Updated Since** now says that any edit counts, so it is not the sign-up date.
+- **Sale → Get Many** has a new **Tags** filter (sales with any of the given sale tags). **Occurred Since** now says it uses the sale date (`occurredAt`) and leaves out sales without one.
+- **Sale → Create or Update** has new **Tags** (only adds) and **Ad ID**; **Sale → Update** has new **Add Tags**, **Remove Tags** and **Ad ID**.
+- Query lists are sent as repeated keys (`?tag=a&tag=b`).
+
 ## 0.7.1
 
 Datta CRM moved to `https://dattacrm.com.br` (the old address keeps working). New credentials now default to the new Base URL, and the README and help links point to `ajuda.dattacrm.com.br`. Credentials already saved keep the Base URL they have; nothing changes in the nodes.

@@ -208,6 +208,47 @@ describe('Sale: Get, Get Many and Update', () => {
 		expect(items.map((i) => (i.json as { id: string }).id)).toEqual(['a', 'b']);
 	});
 
+	it('Get Many sends the tag filter as repeated keys', async () => {
+		const { calls } = await run(
+			{
+				resource: 'sale',
+				operation: 'getAll',
+				returnAll: false,
+				limit: 3,
+				filters: { tags: 'vip, upsell ,' },
+			},
+			[page([], null)],
+		);
+
+		expect(calls[0].qs).toEqual({ tag: ['vip', 'upsell'], limit: 3 });
+		expect(calls[0].arrayFormat).toBe('repeat');
+	});
+
+	it('Create or Update sends adId and tags; Update sends addTags and removeTags', async () => {
+		const { calls } = await run(
+			[
+				{
+					resource: 'sale',
+					operation: 'upsert',
+					transactionId: 'tx1',
+					status: 'paid',
+					value: 10,
+					additionalFields: { adId: ' 1234 ', tags: 'black-friday, vip' },
+				},
+				{
+					resource: 'sale',
+					operation: 'update',
+					saleId: SALE_ID,
+					updateFields: { adId: '99', addTags: 'a,b', removeTags: 'c' },
+				},
+			],
+			[ok({ sale: sale(), result: 'created', leadId: null }, undefined, 201), ok(sale())],
+		);
+
+		expect(calls[0].body).toMatchObject({ adId: '1234', tags: ['black-friday', 'vip'] });
+		expect(calls[1].body).toEqual({ adId: '99', addTags: ['a', 'b'], removeTags: ['c'] });
+	});
+
 	it('Get Many with a limit sends that limit and no filters by default', async () => {
 		const { calls } = await run(
 			{ resource: 'sale', operation: 'getAll', returnAll: false, limit: 7 },
