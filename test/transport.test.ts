@@ -49,6 +49,7 @@ describe('dattaCrmRequest', () => {
 			url: 'https://crm.example.com/api/v1/leads',
 			body: { name: 'Ana' },
 			qs: undefined,
+			arrayFormat: 'repeat',
 			json: true,
 			ignoreHttpStatusErrors: true,
 			returnFullResponse: true,

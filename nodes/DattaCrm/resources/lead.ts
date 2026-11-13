@@ -406,12 +406,28 @@ export const leadFields: INodeProperties[] = [
 		displayOptions: { show: { ...LEAD, operation: ['getAll'] } },
 		options: [
 			{
+				displayName: 'Captured Since',
+				name: 'capturedSince',
+				type: 'dateTime',
+				default: '',
+				description:
+					'Only leads that signed up at or after this date. Every sign-up counts (form, integration, import), not only the first; a lead without a sign-up record counts by its sign-up date. Unlike Updated Since, it does not change when the lead is only edited.',
+			},
+			{
 				displayName: 'Email',
 				name: 'email',
 				type: 'string',
 				placeholder: 'name@email.com',
 				default: '',
 				description: 'Only leads with this email',
+			},
+			{
+				displayName: 'Include Hidden',
+				name: 'includeHidden',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to also return hidden contacts (team, personal). By default only visible leads are returned.',
 			},
 			{
 				displayName: 'List Name or ID',
@@ -421,6 +437,18 @@ export const leadFields: INodeProperties[] = [
 				default: '',
 				description:
 					'Only leads in this list. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Origin',
+				name: 'origin',
+				type: 'options',
+				options: [
+					{ name: 'Instagram', value: 'instagram' },
+					{ name: 'Site', value: 'site' },
+					{ name: 'WhatsApp', value: 'whatsapp' },
+				],
+				default: 'site',
+				description: 'Only leads with this origin (the first one, set when the lead was created)',
 			},
 			{
 				displayName: 'Phone',
@@ -452,7 +480,8 @@ export const leadFields: INodeProperties[] = [
 				name: 'updatedSince',
 				type: 'dateTime',
 				default: '',
-				description: 'Only leads updated at or after this date',
+				description:
+					'Only leads changed at or after this date. Any edit counts, including bulk updates, so it is not the sign-up date: use Captured Since for that.',
 			},
 		],
 	},
@@ -705,7 +734,10 @@ async function getManyLeads(this: IExecuteFunctions, i: number): Promise<IDataOb
 		tag: filters.tag,
 		listId: filters.listId,
 		stageId: filters.stageId,
+		origin: filters.origin,
 		updatedSince: toIsoDate(this, filters.updatedSince, 'Updated Since', i),
+		capturedSince: toIsoDate(this, filters.capturedSince, 'Captured Since', i),
+		includeHidden: filters.includeHidden === true ? 'true' : undefined,
 	});
 	const max = returnAll ? undefined : (this.getNodeParameter('limit', i, 50) as number);
 	return dattaCrmRequestAll.call(this, '/leads', qs, max);
