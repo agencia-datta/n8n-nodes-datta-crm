@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+Reads the period summary of the weekly reports and tells sales from installments, so the last n8n flows can leave the internal routes. Needs the Datta CRM version with `GET /api/v1/reports/weekly-summary`: older versions return 404. The credential does not change (API Key and Base URL).
+
+- New **Report** resource with **Get Weekly Summary** (`GET /reports/weekly-summary`): **Start Date** (`de`) and **End Date** (`ate`) as YYYY-MM-DD, and in **Options** **Timezone** (`timezone`, default America/Sao_Paulo) and **Funnels** (`funis`, names separated by commas). Returns `{ organizationId, range, currency, total, funnels }` unchanged: spend, sign-ups, sales, revenue, MQL/SQL and levels for the account and each funnel.
+- **Sale → Create or Update** and **Sale → Update** have a new **Charge Number** in **Financial Details** (`mirror.chargeNumber`, 1 to 1000): 1 is the sale; 2 or more is an installment or a renewal.
+
 ## 0.8.0
 
 Finds new sign-ups and filters sales by tag, so a flow can work on recent leads and buyers without relying on when the record was last saved. Needs the Datta CRM version with `capturedSince` in `GET /leads` (`origin`, `includeHidden`, sale tags and `adId` already exist in the API). The credential does not change (API Key and Base URL).

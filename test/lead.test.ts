@@ -712,6 +712,7 @@ describe('Datta CRM node', () => {
 			'lead',
 			'list',
 			'lossReason',
+			'report',
 			'sale',
 		];
 		const resource = description.properties.find((p) => p.name === 'resource');

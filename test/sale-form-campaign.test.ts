@@ -95,6 +95,7 @@ describe('Sale: Create or Update', () => {
 						offerName: 'Offer',
 						couponCode: 'C10',
 						installments: 3.0,
+						chargeNumber: '2',
 						payoutCurrency: 'USD',
 						approvedAt: '2026-10-21T08:30:00',
 					},
@@ -131,6 +132,7 @@ describe('Sale: Create or Update', () => {
 				offerName: 'Offer',
 				couponCode: 'C10',
 				installments: 3,
+				chargeNumber: 2,
 				payoutCurrency: 'USD',
 				approvedAt: '2026-10-21T11:30:00.000Z',
 			},
@@ -301,7 +303,7 @@ describe('Sale: Get, Get Many and Update', () => {
 					value: 0,
 					productName: 'New name',
 					buyer: { email: 'x@example.com' },
-					mirror: { installments: 2, processingFee: 1.5 },
+					mirror: { installments: 2, chargeNumber: 3, processingFee: 1.5 },
 					gateway: 'ignored',
 					transactionId: 'ignored',
 				},
@@ -315,7 +317,7 @@ describe('Sale: Get, Get Many and Update', () => {
 			value: 0,
 			productName: 'New name',
 			buyer: { email: 'x@example.com' },
-			mirror: { installments: 2, processingFee: 1.5 },
+			mirror: { installments: 2, chargeNumber: 3, processingFee: 1.5 },
 		});
 		expect(calls[0].body).not.toHaveProperty('gateway');
 		expect(calls[0].body).not.toHaveProperty('transactionId');

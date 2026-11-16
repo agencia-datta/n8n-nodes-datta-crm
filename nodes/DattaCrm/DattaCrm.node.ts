@@ -17,6 +17,7 @@ import { executeForm, formDescription } from './resources/form';
 import { executeLead, leadDescription } from './resources/lead';
 import { executeList, listDescription } from './resources/list';
 import { executeLossReason, lossReasonDescription } from './resources/lossReason';
+import { executeReport, reportDescription } from './resources/report';
 import { executeSale, saleDescription } from './resources/sale';
 import {
 	getAllStages,
@@ -44,6 +45,7 @@ const executors: Record<string, ResourceExecutor> = {
 	adMetric: executeAdMetric,
 	form: executeForm,
 	emailCampaign: executeEmailCampaign,
+	report: executeReport,
 };
 
 export class DattaCrm implements INodeType {
@@ -55,7 +57,7 @@ export class DattaCrm implements INodeType {
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description:
-			'Create and update leads, sales, custom fields, forms and email drafts, and send ad metrics, in Datta CRM',
+			'Create and update leads, sales, custom fields, forms and email drafts, send ad metrics and read period reports, in Datta CRM',
 		defaults: {
 			name: 'Datta CRM',
 		},
@@ -78,6 +80,7 @@ export class DattaCrm implements INodeType {
 					{ name: 'Lead', value: 'lead' },
 					{ name: 'List', value: 'list' },
 					{ name: 'Loss Reason', value: 'lossReason' },
+					{ name: 'Report', value: 'report' },
 					{ name: 'Sale', value: 'sale' },
 				],
 				default: 'lead',
@@ -91,6 +94,7 @@ export class DattaCrm implements INodeType {
 			...adMetricDescription,
 			...formDescription,
 			...emailCampaignDescription,
+			...reportDescription,
 		],
 	};
 
