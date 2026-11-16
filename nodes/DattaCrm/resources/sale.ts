@@ -56,6 +56,15 @@ const mirrorOptions: INodeProperties[] = [
 		description: 'When the payment was approved',
 	},
 	{
+		displayName: 'Charge Number',
+		name: 'chargeNumber',
+		type: 'number',
+		typeOptions: { minValue: 1, maxValue: 1000, numberPrecision: 0 },
+		default: 1,
+		description:
+			'Which charge of the purchase this is (1 to 1000): 1 is the sale itself; 2 or more is an installment or a renewal',
+	},
+	{
 		displayName: 'Coupon Code',
 		name: 'couponCode',
 		type: 'string',
@@ -484,6 +493,11 @@ function buildMirror(context: IExecuteFunctions, raw: unknown, itemIndex: number
 	if (mirror.installments !== undefined) {
 		mirror.installments = Math.trunc(
 			numberOf(context, mirror.installments, 'Installments', itemIndex),
+		);
+	}
+	if (mirror.chargeNumber !== undefined) {
+		mirror.chargeNumber = Math.trunc(
+			numberOf(context, mirror.chargeNumber, 'Charge Number', itemIndex),
 		);
 	}
 	if (mirror.approvedAt !== undefined) {
