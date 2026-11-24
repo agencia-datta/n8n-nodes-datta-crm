@@ -78,7 +78,7 @@ describe('Sale: Create or Update', () => {
 					productName: 'Course',
 					paymentType: 'card',
 					occurredAt: '2026-10-20T10:00:00',
-					buyer: { name: 'Ana', email: 'ana@example.com', phone: '' },
+					buyer: { name: 'Ana', email: 'ana@example.com', phone: '', document: '123.456.789-09' },
 					utm: { source: 'g', campaign: 'c' },
 					mirror: {
 						grossValue: 120,
@@ -115,7 +115,7 @@ describe('Sale: Create or Update', () => {
 			productName: 'Course',
 			paymentType: 'card',
 			occurredAt: '2026-10-20T13:00:00.000Z',
-			buyer: { name: 'Ana', email: 'ana@example.com' },
+			buyer: { name: 'Ana', email: 'ana@example.com', document: '123.456.789-09' },
 			utm: { source: 'g', campaign: 'c' },
 			mirror: {
 				grossValue: 120,

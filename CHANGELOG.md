@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0
+
+Sends the buyer's CPF or CNPJ with the sale. Needs the Datta CRM version with `buyer.document` in `POST /sales` and `PATCH /sales/{id}`: older versions ignore the field. The credential does not change (API Key and Base URL).
+
+- **Sale → Create or Update** and **Sale → Update** have a new **Document** in **Buyer** (`buyer.document`): the buyer's CPF or CNPJ, with or without punctuation. It is saved on the sale (digits only) and fills the lead's CPF or CNPJ field when that field is empty. A sale with only the document, without email and phone, is linked to the lead that already has that CPF or CNPJ; if none has it, the sale stays without a lead.
+- The sale in the output has two new fields from the API: `buyer.document` and `excludedFromSalesCount` (true when the sale has a sale tag marked "does not count as a sale", like the automatic "Parcela ou renovação" tag every account has for charge number 2 or more: the sale adds to revenue but not to the number of sales in the reports). Keep sending **Charge Number** on installments and renewals: that tag reads it.
+
 ## 0.9.0
 
 Reads the period summary of the weekly reports and tells sales from installments, so the last n8n flows can leave the internal routes. Needs the Datta CRM version with `GET /api/v1/reports/weekly-summary`: older versions return 404. The credential does not change (API Key and Base URL).

@@ -129,8 +129,18 @@ const buyerProperty: INodeProperties = {
 	type: 'collection',
 	placeholder: 'Add Buyer Detail',
 	default: {},
-	description: 'The buyer. The sale is linked to a lead matched by email or phone.',
+	description:
+		'The buyer. The sale is linked to a lead matched by email or phone; with only a document, to the lead that already has that CPF or CNPJ.',
 	options: [
+		{
+			displayName: 'Document',
+			name: 'document',
+			type: 'string',
+			placeholder: '123.456.789-09',
+			default: '',
+			description:
+				"The buyer's CPF or CNPJ, with or without punctuation. It is saved on the sale and fills the lead's CPF or CNPJ field when that field is empty. Without email and phone, the sale is linked to the lead that already has this document; no lead is created from the document alone.",
+		},
 		{
 			displayName: 'Email',
 			name: 'email',
